@@ -6,7 +6,7 @@ import EmergencyCard from "../components/Emergency/EmergencyCard";
 import EmergencyCountdown from "../components/Emergency/EmergencyCountdown";
 
 import MonitoringService from "../services/MonitoringService";
-
+import HistoryService from "../services/HistoryService";
 /**
  * HomePage
  *
@@ -131,18 +131,33 @@ const HomePage = () => {
         console.log("Permission:", permission);
 
         if (permission === "granted") {
-          window.addEventListener(
-            "deviceorientation",
-            handleOrientation
-          );
+  window.addEventListener(
+    "deviceorientation",
+    handleOrientation
+  );
 
-          MonitoringService.start(
-            startEmergencyCountdown
-          );
+  MonitoringService.start(
+    startEmergencyCountdown
+  );
 
-          setIsMonitoring(true);
-          setStatus("Monitoring Active");
-        } else {
+  HistoryService.addIncident({
+    id: crypto.randomUUID(),
+    timestamp: Date.now(),
+    latitude: 18.5204,
+    longitude: 73.8567,
+    accuracy: 5,
+    reason: "Test Incident",
+    cancelled: false,
+  });
+
+  console.log(
+    "History:",
+    HistoryService.getIncidents()
+  );
+
+  setIsMonitoring(true);
+  setStatus("Monitoring Active");
+} else {
           setStatus("Permission denied.");
         }
       } catch (error) {
@@ -159,8 +174,23 @@ const HomePage = () => {
 
       MonitoringService.start(startEmergencyCountdown);
 
-      setIsMonitoring(true);
-      setStatus("Monitoring Active");
+HistoryService.addIncident({
+  id: crypto.randomUUID(),
+  timestamp: Date.now(),
+  latitude: 18.5204,
+  longitude: 73.8567,
+  accuracy: 5,
+  reason: "Test Incident",
+  cancelled: false,
+});
+
+console.log(
+  "History:",
+  HistoryService.getIncidents()
+);
+
+setIsMonitoring(true);
+setStatus("Monitoring Active");
     }
   };
 

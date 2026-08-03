@@ -1,23 +1,23 @@
 import "./SensorCard.css";
 
 interface SensorCardProps {
-  alpha: number | null;
-  beta: number | null;
-  gamma: number | null;
+  x: number | null;
+  y: number | null;
+  z: number | null;
+  magnitude: number | null;
   status: string;
-  devicePosition: string;
   onRequestPermission: () => void;
 }
 
 /**
- * Displays the current device orientation values.
+ * Displays the current accelerometer values.
  */
 const SensorCard = ({
-  alpha,
-  beta,
-  gamma,
+  x,
+  y,
+  z,
+  magnitude,
   status,
-  devicePosition,
   onRequestPermission,
 }: SensorCardProps) => {
   return (
@@ -25,27 +25,31 @@ const SensorCard = ({
       <h2>Motion Sensor</h2>
 
       <div className="sensor-value">
-        <span>Alpha (Z)</span>
-        <span>{alpha != null ? `${alpha.toFixed(2)}°` : "--"}</span>
+        <span>Acceleration X</span>
+        <span>{x !== null ? `${x.toFixed(2)} m/s²` : "--"}</span>
       </div>
 
       <div className="sensor-value">
-        <span>Beta (X)</span>
-        <span>{beta != null ? `${beta.toFixed(2)}°` : "--"}</span>
+        <span>Acceleration Y</span>
+        <span>{y !== null ? `${y.toFixed(2)} m/s²` : "--"}</span>
       </div>
 
       <div className="sensor-value">
-        <span>Gamma (Y)</span>
-        <span>{gamma != null ? `${gamma.toFixed(2)}°` : "--"}</span>
+        <span>Acceleration Z</span>
+        <span>{z !== null ? `${z.toFixed(2)} m/s²` : "--"}</span>
+      </div>
+
+      <div className="sensor-value">
+        <span>Magnitude</span>
+        <span>
+          {magnitude !== null
+            ? `${magnitude.toFixed(2)} m/s²`
+            : "--"}
+        </span>
       </div>
 
       <div className="status">
         <strong>Status:</strong> {status}
-      </div>
-
-      <div className="device-position">
-        <strong>Device Position</strong>
-        <p>{devicePosition}</p>
       </div>
 
       <button

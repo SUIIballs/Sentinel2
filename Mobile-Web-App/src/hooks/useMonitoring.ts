@@ -30,11 +30,9 @@ export default function useMonitoring() {
           setEmergency(true);
           setStatus("Emergency Detected");
         },
-
         (sensorData) => {
           setSensor(sensorData);
         },
-
         (gpsData) => {
           setLocation(gpsData);
         }
@@ -51,7 +49,6 @@ export default function useMonitoring() {
 
     setIsMonitoring(false);
     setEmergency(false);
-
     setStatus("Monitoring Inactive");
 
     setSensor(null);
@@ -59,18 +56,28 @@ export default function useMonitoring() {
   }, []);
 
   return {
+    // Monitoring state
     isMonitoring,
-
+    status,
     emergency,
 
-    status,
-
+    // Complete sensor objects
     sensor,
-
     location,
 
-    startMonitoring,
+    // Accelerometer values
+    x: sensor?.x ?? null,
+    y: sensor?.y ?? null,
+    z: sensor?.z ?? null,
+    magnitude: sensor?.magnitude ?? null,
 
+    // GPS values
+    latitude: location?.latitude ?? null,
+    longitude: location?.longitude ?? null,
+    accuracy: location?.accuracy ?? null,
+
+    // Actions
+    startMonitoring,
     stopMonitoring,
   };
 }
