@@ -9,9 +9,11 @@ import type {
 
 class MonitoringService {
   private emergencyCallback?: () => void;
+
   private sensorCallback?: (
     data: AccelerometerData
   ) => void;
+
   private locationCallback?: (
     data: GPSData
   ) => void;
@@ -19,9 +21,6 @@ class MonitoringService {
   private latestSensor: AccelerometerData | null = null;
   private latestLocation: GPSData | null = null;
 
-  /**
-   * Starts monitoring.
-   */
   async start(
     onEmergency?: () => void,
     onSensorUpdate?: (
@@ -31,62 +30,64 @@ class MonitoringService {
       data: GPSData
     ) => void
   ): Promise<boolean> {
+    console.log("MonitoringService started.");
+
     this.emergencyCallback = onEmergency;
     this.sensorCallback = onSensorUpdate;
     this.locationCallback = onLocationUpdate;
 
-    const sensorStarted =
-      await SensorService.start((data) => {
+    const sensorStarted = await SensorService.start(
+      (data) => {
         this.latestSensor = data;
 
         this.sensorCallback?.(data);
 
-        const detected =
-          FallDetectionService.detectFall(data);
-
-        if (detected) {
+        if (
+          FallDetectionService.detectFall(data)
+        ) {
           this.emergencyCallback?.();
         }
-      });
+      }
+    );
 
     if (!sensorStarted) {
+      console.warn(
+        "Failed to start SensorService."
+      );
       return false;
     }
 
-    await LocationService.start((data) => {
-      this.latestLocation = data;
+    const locationStarted =
+      await LocationService.start((data) => {
+        this.latestLocation = data;
 
-      this.locationCallback?.(data);
-    });
+        this.locationCallback?.(data);
+      });
+
+    if (!locationStarted) {
+      console.warn(
+        "Failed to start LocationService."
+      );
+    }
 
     return true;
   }
 
-  /**
-   * Stops monitoring.
-   */
   stop(): void {
+    console.log("MonitoringService stopped.");
+
     SensorService.stop();
     LocationService.stop();
   }
 
-  /**
-   * Latest accelerometer reading.
-   */
   getLatestSensor(): AccelerometerData | null {
     return this.latestSensor;
   }
 
-  /**
-   * Latest GPS reading.
-   */
   getLatestLocation(): GPSData | null {
     return this.latestLocation;
   }
 
-  /**
-   * Clears cached sensor data.
-   */
   reset(): void {
     this.latestSensor = null;
     this.latestLocation = null;

@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 
 import MonitoringService from "../services/MonitoringService";
+import SensorService from "../services/SensorService";
 
 import type {
   AccelerometerData,
@@ -24,23 +25,42 @@ export default function useMonitoring() {
     useState(false);
 
   const startMonitoring = useCallback(async () => {
-    const started =
-      await MonitoringService.start(
-        () => {
-          setEmergency(true);
-          setStatus("Emergency Detected");
-        },
-        (sensorData) => {
-          setSensor(sensorData);
-        },
-        (gpsData) => {
-          setLocation(gpsData);
-        }
-      );
+    console.log("Requesting motion permission...");
+
+    const permissionGranted =
+      await SensorService.requestPermission();
+
+    if (!permissionGranted) {
+      setStatus("Motion Permission Denied");
+      return;
+    }
+
+    console.log("Permission granted.");
+
+    const started = await MonitoringService.start(
+      () => {
+        console.log("Emergency detected.");
+
+        setEmergency(true);
+        setStatus("Emergency Detected");
+      },
+
+      (sensorData) => {
+        console.log("Sensor:", sensorData);
+        setSensor(sensorData);
+      },
+
+      (gpsData) => {
+        console.log("GPS:", gpsData);
+        setLocation(gpsData);
+      }
+    );
 
     if (started) {
       setIsMonitoring(true);
       setStatus("Monitoring Active");
+    } else {
+      setStatus("Failed to Start");
     }
   }, []);
 
@@ -56,27 +76,22 @@ export default function useMonitoring() {
   }, []);
 
   return {
-    // Monitoring state
     isMonitoring,
     status,
     emergency,
 
-    // Complete sensor objects
     sensor,
     location,
 
-    // Accelerometer values
     x: sensor?.x ?? null,
     y: sensor?.y ?? null,
     z: sensor?.z ?? null,
     magnitude: sensor?.magnitude ?? null,
 
-    // GPS values
     latitude: location?.latitude ?? null,
     longitude: location?.longitude ?? null,
     accuracy: location?.accuracy ?? null,
 
-    // Actions
     startMonitoring,
     stopMonitoring,
   };

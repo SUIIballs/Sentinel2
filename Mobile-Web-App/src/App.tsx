@@ -1,14 +1,22 @@
-import HomePage from "./pages/HomePage";
+import { useState } from "react";
 
-/**
- * Root application component.
- *
- * Currently renders the HomePage.
- * Future responsibilities may include routing,
- * global providers, and application layout.
- */
+import HomePage from "./pages/HomePage";
+import HistoryPage from "./pages/HistoryPage";
+
 function App() {
-  return <HomePage />;
+  const [page, setPage] = useState<"home" | "history">(
+    "home"
+  );
+
+  return page === "home" ? (
+    <HomePage
+      onViewHistory={() => setPage("history")}
+    />
+  ) : (
+    <HistoryPage
+      onBack={() => setPage("home")}
+    />
+  );
 }
 
 export default App;

@@ -6,6 +6,7 @@ interface SensorCardProps {
   z: number | null;
   magnitude: number | null;
   status: string;
+  buttonText: string;
   onRequestPermission: () => void;
 }
 
@@ -18,6 +19,7 @@ const SensorCard = ({
   z,
   magnitude,
   status,
+  buttonText,
   onRequestPermission,
 }: SensorCardProps) => {
   return (
@@ -56,7 +58,7 @@ const SensorCard = ({
         className="permission-btn"
         onClick={onRequestPermission}
       >
-        Request Sensor Permission
+        {buttonText}
       </button>
     </section>
   );

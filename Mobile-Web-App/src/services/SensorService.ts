@@ -1,88 +1,120 @@
 import type { AccelerometerData } from "../types/sensor";
 
-class SensorService {
-  private listener: ((event: DeviceMotionEvent) => void) | null = null;
-  private isRunning = false;
-
-  /**
-   * Starts listening to accelerometer data.
-   * Returns true if the sensor started successfully.
-   */
-  async start(
-    callback: (data: AccelerometerData) => void
-  ): Promise<boolean> {
-    // Prevent duplicate listeners
-    if (this.isRunning) {
-      return true;
-    }
-
-    // Check browser support
-    if (!("DeviceMotionEvent" in window)) {
-      console.warn("DeviceMotion API is not supported on this device.");
-      return false;
-    }
-
-    // iOS 13+ permission request
-    type DeviceMotionEventIOS = {
+type DeviceMotionEventIOS = {
   requestPermission?: () => Promise<"granted" | "denied">;
 };
 
-const motionEvent = DeviceMotionEvent as unknown as DeviceMotionEventIOS;
+class SensorService {
+  private listener: ((event: DeviceMotionEvent) => void) | null = null;
+  private isRunning = false;
+  private permissionGranted = false;
+
+  /**
+   * Request motion permission (iOS only).
+   * This MUST be called directly from a button click.
+   */
+  async requestPermission(): Promise<boolean> {
+    if (this.permissionGranted) {
+      return true;
+    }
+
+    if (!("DeviceMotionEvent" in window)) {
+      console.warn("DeviceMotion not supported.");
+      return false;
+    }
+
+    const motionEvent =
+      DeviceMotionEvent as unknown as DeviceMotionEventIOS;
 
     if (typeof motionEvent.requestPermission === "function") {
       try {
-        const permission = await motionEvent.requestPermission();
+        const result =
+          await motionEvent.requestPermission();
 
-        if (permission !== "granted") {
-          console.warn("Motion permission denied.");
+        console.log("Motion Permission:", result);
+
+        if (result !== "granted") {
           return false;
         }
-      } catch (error) {
-        console.error("Failed to request motion permission:", error);
+      } catch (err) {
+        console.error(err);
         return false;
       }
     }
 
-    // Create listener
-    this.listener = (event: DeviceMotionEvent) => {
-      const x = event.accelerationIncludingGravity?.x ?? 0;
-      const y = event.accelerationIncludingGravity?.y ?? 0;
-      const z = event.accelerationIncludingGravity?.z ?? 0;
-
-      callback({
-        x,
-        y,
-        z,
-        magnitude: Math.sqrt(x * x + y * y + z * z),
-        timestamp: Date.now(),
-      });
-    };
-
-    // Register listener
-    window.addEventListener("devicemotion", this.listener);
-
-    this.isRunning = true;
+    this.permissionGranted = true;
 
     return true;
   }
 
   /**
-   * Stops listening to accelerometer updates.
+   * Starts sensor monitoring.
    */
+  async start(
+    callback: (data: AccelerometerData) => void
+  ): Promise<boolean> {
+    if (this.isRunning) {
+      return true;
+    }
+
+    if (!this.permissionGranted) {
+      console.warn(
+        "Motion permission has not been granted."
+      );
+      return false;
+    }
+
+    this.listener = (event: DeviceMotionEvent) => {
+      const x =
+        event.accelerationIncludingGravity?.x ?? 0;
+
+      const y =
+        event.accelerationIncludingGravity?.y ?? 0;
+
+      const z =
+        event.accelerationIncludingGravity?.z ?? 0;
+
+      callback({
+        x,
+        y,
+        z,
+        magnitude: Math.sqrt(
+          x * x +
+            y * y +
+            z * z
+        ),
+        timestamp: Date.now(),
+      });
+    };
+
+    window.addEventListener(
+      "devicemotion",
+      this.listener
+    );
+
+    this.isRunning = true;
+
+    console.log("SensorService started.");
+
+    return true;
+  }
+
   stop(): void {
     if (!this.listener) {
       return;
     }
 
-    window.removeEventListener("devicemotion", this.listener);
+    window.removeEventListener(
+      "devicemotion",
+      this.listener
+    );
 
     this.listener = null;
     this.isRunning = false;
+
+    console.log("SensorService stopped.");
   }
 
-  /**
-   * Returns whether the service is running.
-   */
   get running(): boolean {
     return this.isRunning;
   }
