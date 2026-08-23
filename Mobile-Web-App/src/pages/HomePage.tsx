@@ -17,13 +17,33 @@ const HomePage = ({
   onViewHistory,
 }: HomePageProps) => {
   const {
+    // Accelerometer
     x,
     y,
     z,
     magnitude,
+
+    // Gyroscope
+    alpha,
+    beta,
+    gamma,
+
+    // Fall Detection Diagnostics
+    fallStage,
+    fallAcceleration,
+    fallRotation,
+    fallJerk,
+    fallScore,
+    candidateImpact,
+    candidateImpactMagnitude,
+    fallBufferSize,
+
+    // Monitoring
     status,
     emergency,
     isMonitoring,
+
+    // Controls
     startMonitoring,
     stopMonitoring,
   } = useMonitoring();
@@ -51,7 +71,9 @@ const HomePage = ({
       () => {
         setCountdownActive(false);
 
-        console.log("Emergency confirmed.");
+        console.log(
+          "Emergency confirmed."
+        );
       }
     );
   };
@@ -65,12 +87,18 @@ const HomePage = ({
     setCountdownActive(false);
     setCountdownSeconds(10);
 
-    console.log("Emergency cancelled.");
+    console.log(
+      "Emergency cancelled."
+    );
   };
 
   return (
     <main className="home-page">
       <Header />
+
+      {/* ================================
+          SYSTEM STATUS
+      ================================= */}
 
       <StatusCard
         title="System Status"
@@ -79,14 +107,25 @@ const HomePage = ({
             ? "Monitoring Active"
             : "Monitoring Inactive"
         }
-        color={isMonitoring ? "green" : "red"}
+        color={
+          isMonitoring
+            ? "green"
+            : "red"
+        }
       />
+
+      {/* ================================
+          MOTION SENSOR
+      ================================= */}
 
       <SensorCard
         x={x}
         y={y}
         z={z}
         magnitude={magnitude}
+        alpha={alpha}
+        beta={beta}
+        gamma={gamma}
         status={status}
         buttonText={
           isMonitoring
@@ -100,15 +139,212 @@ const HomePage = ({
         }
       />
 
+      {/* ================================
+          FALL DETECTION DIAGNOSTICS
+      ================================= */}
+
+      <section
+        style={{
+          marginTop: "20px",
+          padding: "20px",
+          borderRadius: "16px",
+          background: "#1e293b",
+          color: "white",
+        }}
+      >
+        <h2
+          style={{
+            marginTop: 0,
+            marginBottom: "18px",
+          }}
+        >
+          Fall Detection Diagnostics
+        </h2>
+
+        {/* Stage */}
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            padding: "10px 0",
+            borderBottom:
+              "1px solid #334155",
+          }}
+        >
+          <strong>Stage</strong>
+
+          <span>
+            {fallStage}
+          </span>
+        </div>
+
+        {/* Acceleration */}
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            padding: "10px 0",
+            borderBottom:
+              "1px solid #334155",
+          }}
+        >
+          <strong>
+            Acceleration
+          </strong>
+
+          <span>
+            {fallAcceleration.toFixed(2)} m/s²
+          </span>
+        </div>
+
+        {/* Rotation */}
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            padding: "10px 0",
+            borderBottom:
+              "1px solid #334155",
+          }}
+        >
+          <strong>
+            Rotation
+          </strong>
+
+          <span>
+            {fallRotation.toFixed(2)} °/s
+          </span>
+        </div>
+
+        {/* Jerk */}
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            padding: "10px 0",
+            borderBottom:
+              "1px solid #334155",
+          }}
+        >
+          <strong>
+            Jerk
+          </strong>
+
+          <span>
+            {fallJerk.toFixed(2)} m/s³
+          </span>
+        </div>
+
+        {/* Fall Score */}
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            padding: "10px 0",
+            borderBottom:
+              "1px solid #334155",
+          }}
+        >
+          <strong>
+            Fall Score
+          </strong>
+
+          <span>
+            {fallScore.toFixed(3)}
+          </span>
+        </div>
+
+        {/* Candidate Impact */}
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            padding: "10px 0",
+            borderBottom:
+              "1px solid #334155",
+          }}
+        >
+          <strong>
+            Candidate Impact
+          </strong>
+
+          <span>
+            {candidateImpact
+              ? "YES"
+              : "NO"}
+          </span>
+        </div>
+
+        {/* Impact Magnitude */}
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            padding: "10px 0",
+            borderBottom:
+              "1px solid #334155",
+          }}
+        >
+          <strong>
+            Impact Magnitude
+          </strong>
+
+          <span>
+            {candidateImpactMagnitude.toFixed(
+              2
+            )}{" "}
+            m/s²
+          </span>
+        </div>
+
+        {/* Buffer */}
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            padding: "10px 0",
+          }}
+        >
+          <strong>
+            Buffer Samples
+          </strong>
+
+          <span>
+            {fallBufferSize}
+          </span>
+        </div>
+      </section>
+
+      {/* ================================
+          EMERGENCY COUNTDOWN
+      ================================= */}
+
       <EmergencyCountdown
         active={countdownActive}
         seconds={countdownSeconds}
         onCancel={cancelEmergency}
       />
 
-      <EmergencyCard emergency={emergency} />
+      {/* ================================
+          EMERGENCY STATUS
+      ================================= */}
 
-      {/* Simulate Fall */}
+      <EmergencyCard
+        emergency={emergency}
+      />
+
+      {/* ================================
+          SIMULATE FALL
+      ================================= */}
+
       <div
         style={{
           display: "flex",
@@ -132,7 +368,10 @@ const HomePage = ({
         </button>
       </div>
 
-      {/* View History */}
+      {/* ================================
+          VIEW HISTORY
+      ================================= */}
+
       <div
         style={{
           display: "flex",
@@ -152,7 +391,7 @@ const HomePage = ({
             fontWeight: "bold",
           }}
         >
-          📜 View History
+          View History
         </button>
       </div>
     </main>

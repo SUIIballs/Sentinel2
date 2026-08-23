@@ -6,6 +6,19 @@ export interface AccelerometerData {
   timestamp: number;
 }
 
+export interface GyroscopeData {
+  alpha: number;
+  beta: number;
+  gamma: number;
+  timestamp: number;
+}
+
+export interface MotionSensorData {
+  acceleration: AccelerometerData;
+  gyroscope: GyroscopeData;
+  timestamp: number;
+}
+
 export interface GPSData {
   latitude: number;
   longitude: number;

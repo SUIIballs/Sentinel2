@@ -3,7 +3,7 @@ import LocationService from "./LocationService";
 import FallDetectionService from "./FallDetectionService";
 
 import type {
-  AccelerometerData,
+  MotionSensorData,
   GPSData,
 } from "../types/sensor";
 
@@ -11,58 +11,94 @@ class MonitoringService {
   private emergencyCallback?: () => void;
 
   private sensorCallback?: (
-    data: AccelerometerData
+    data: MotionSensorData
   ) => void;
 
   private locationCallback?: (
     data: GPSData
   ) => void;
 
-  private latestSensor: AccelerometerData | null = null;
-  private latestLocation: GPSData | null = null;
+  private latestSensor:
+    MotionSensorData | null = null;
+
+  private latestLocation:
+    GPSData | null = null;
 
   async start(
     onEmergency?: () => void,
     onSensorUpdate?: (
-      data: AccelerometerData
+      data: MotionSensorData
     ) => void,
     onLocationUpdate?: (
       data: GPSData
     ) => void
   ): Promise<boolean> {
-    console.log("MonitoringService started.");
-
-    this.emergencyCallback = onEmergency;
-    this.sensorCallback = onSensorUpdate;
-    this.locationCallback = onLocationUpdate;
-
-    const sensorStarted = await SensorService.start(
-      (data) => {
-        this.latestSensor = data;
-
-        this.sensorCallback?.(data);
-
-        if (
-          FallDetectionService.detectFall(data)
-        ) {
-          this.emergencyCallback?.();
-        }
-      }
+    console.log(
+      "MonitoringService started."
     );
+
+    this.emergencyCallback =
+      onEmergency;
+
+    this.sensorCallback =
+      onSensorUpdate;
+
+    this.locationCallback =
+      onLocationUpdate;
+
+    // ==========================================
+    // SENSOR MONITORING
+    // ==========================================
+
+    const sensorStarted =
+      await SensorService.start(
+        (data: MotionSensorData) => {
+          // Store latest sensor data
+          this.latestSensor = data;
+
+          // Send sensor data to UI
+          this.sensorCallback?.(data);
+
+          // ========================================
+          // FALL DETECTION
+          // ========================================
+
+          if (
+            FallDetectionService.detectFall(
+              data
+            )
+          ) {
+            console.log(
+              "Fall detected by MonitoringService."
+            );
+
+            this.emergencyCallback?.();
+          }
+        }
+      );
 
     if (!sensorStarted) {
       console.warn(
         "Failed to start SensorService."
       );
+
       return false;
     }
 
-    const locationStarted =
-      await LocationService.start((data) => {
-        this.latestLocation = data;
+    // ==========================================
+    // GPS MONITORING
+    // ==========================================
 
-        this.locationCallback?.(data);
-      });
+    const locationStarted =
+      await LocationService.start(
+        (data) => {
+          this.latestLocation = data;
+
+          this.locationCallback?.(
+            data
+          );
+        }
+      );
 
     if (!locationStarted) {
       console.warn(
@@ -73,20 +109,40 @@ class MonitoringService {
     return true;
   }
 
+  // ==========================================
+  // STOP MONITORING
+  // ==========================================
+
   stop(): void {
-    console.log("MonitoringService stopped.");
+    console.log(
+      "MonitoringService stopped."
+    );
 
     SensorService.stop();
     LocationService.stop();
   }
 
-  getLatestSensor(): AccelerometerData | null {
+  // ==========================================
+  // GET LATEST SENSOR DATA
+  // ==========================================
+
+  getLatestSensor():
+    MotionSensorData | null {
     return this.latestSensor;
   }
 
-  getLatestLocation(): GPSData | null {
+  // ==========================================
+  // GET LATEST LOCATION
+  // ==========================================
+
+  getLatestLocation():
+    GPSData | null {
     return this.latestLocation;
   }
+
+  // ==========================================
+  // RESET
+  // ==========================================
 
   reset(): void {
     this.latestSensor = null;
