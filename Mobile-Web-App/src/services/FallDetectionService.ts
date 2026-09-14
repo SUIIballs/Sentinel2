@@ -1,8 +1,9 @@
 import type { MotionSensorData } from "../types/sensor";
 
-interface AccelerationSample {
+interface MotionSample {
   time: number;
   magnitude: number;
+  rotation: number;
 }
 
 class FallDetectionService {
@@ -10,65 +11,22 @@ class FallDetectionService {
   // DETECTION PARAMETERS
   // ==========================================
 
-  /**
-   * Minimum acceleration magnitude required
-   * before an event can become a candidate impact.
-   */
   private readonly IMPACT_THRESHOLD = 20.0;
-
-  /**
-   * Pre-impact acceleration threshold.
-   *
-   * A significant reduction toward this value
-   * provides evidence of a fall before impact.
-   */
   private readonly FREE_FALL_THRESHOLD = 8.0;
-
-  /**
-   * Amount of sensor history retained before
-   * a candidate impact.
-   */
   private readonly PRE_IMPACT_WINDOW = 1000;
-
-  /**
-   * Amount of sensor data observed after impact.
-   */
   private readonly POST_IMPACT_WINDOW = 1200;
-
-  /**
-   * Prevents repeated detection immediately
-   * after a confirmed event.
-   */
   private readonly COOLDOWN_TIME = 3000;
-
-  /**
-   * Final weighted score required for confirmation.
-   */
   private readonly FALL_SCORE_THRESHOLD = 0.68;
 
   // ==========================================
   // SCORE WEIGHTS
   // ==========================================
 
-  /**
-   * Impact is the strongest direct signal.
-   */
-  private readonly IMPACT_WEIGHT = 0.35;
-
-  /**
-   * Pre-impact acceleration drop.
-   */
+  private readonly IMPACT_WEIGHT = 0.30;
   private readonly PRE_IMPACT_WEIGHT = 0.25;
-
-  /**
-   * Maximum jerk during the complete event.
-   */
-  private readonly JERK_WEIGHT = 0.25;
-
-  /**
-   * Post-impact behavior.
-   */
+  private readonly JERK_WEIGHT = 0.20;
   private readonly POST_IMPACT_WEIGHT = 0.15;
+  private readonly ROTATION_WEIGHT = 0.10;
 
   // ==========================================
   // JERK PARAMETERS
@@ -78,46 +36,35 @@ class FallDetectionService {
   private readonly HIGH_JERK_FULL = 1000;
 
   // ==========================================
-  // BUFFER
+  // POST-IMPACT ROTATION
   // ==========================================
 
-  private accelerationBuffer: AccelerationSample[] = [];
+  private readonly STABLE_ROTATION = 25;
+  private readonly UNSTABLE_ROTATION = 80;
+
+  // ==========================================
+  // SENSOR BUFFER
+  // ==========================================
+
+  private motionBuffer: MotionSample[] = [];
 
   // ==========================================
   // ACTIVE EVENT STATE
   // ==========================================
 
-  /**
-   * True only while a candidate event is being
-   * analyzed.
-   */
   private candidateImpact = false;
-
   private candidateImpactTime = 0;
-
   private candidateImpactMagnitude = 0;
-
-  /**
-   * Maximum jerk observed during the current
-   * candidate event.
-   */
   private eventMaxJerk = 0;
 
   // ==========================================
   // PERSISTENT EVENT DIAGNOSTICS
   // ==========================================
 
-  /**
-   * Remains true after an impact has been detected
-   * so the UI can display the last detected event.
-   */
   private lastImpactDetected = false;
-
-  /**
-   * Preserves the magnitude of the last detected
-   * impact after analysis has finished.
-   */
   private lastImpactMagnitude = 0;
+  private lastEventMaxJerk = 0;
+  private lastPostImpactRotation = 0;
 
   private cooldownUntil = 0;
 
@@ -134,20 +81,15 @@ class FallDetectionService {
     | "FALSE_ALARM" = "NORMAL";
 
   private lastAcceleration = 0;
-
   private lastRotation = 0;
-
   private lastJerk = 0;
-
   private lastFallScore = 0;
 
   // ==========================================
-  // MAIN DETECTOR
+  // MAIN FALL DETECTION
   // ==========================================
 
-  detectFall(
-    data: MotionSensorData
-  ): boolean {
+  detectFall(data: MotionSensorData): boolean {
     const now = Date.now();
 
     const magnitude =
@@ -169,28 +111,26 @@ class FallDetectionService {
           gamma * gamma
       );
 
-    // ==========================================
-    // STORE CURRENT SENSOR VALUES
-    // ==========================================
+    // ------------------------------------------
+    // CURRENT SENSOR VALUES
+    // ------------------------------------------
 
-    this.lastAcceleration =
-      magnitude;
+    this.lastAcceleration = magnitude;
+    this.lastRotation = rotationMagnitude;
 
-    this.lastRotation =
-      rotationMagnitude;
-
-    // ==========================================
-    // BUFFER SAMPLE
-    // ==========================================
+    // ------------------------------------------
+    // ADD SAMPLE
+    // ------------------------------------------
 
     this.addSample(
       now,
-      magnitude
+      magnitude,
+      rotationMagnitude
     );
 
-    // ==========================================
+    // ------------------------------------------
     // CURRENT JERK
-    // ==========================================
+    // ------------------------------------------
 
     const jerk =
       this.calculateCurrentJerk();
@@ -198,37 +138,25 @@ class FallDetectionService {
     this.lastJerk = jerk;
 
     // ==========================================
-    // ACTIVE EVENT ANALYSIS
+    // ACTIVE CANDIDATE EVENT
     // ==========================================
 
-    if (
-      this.candidateImpact
-    ) {
-      this.currentStage =
-        "ANALYZING";
+    if (this.candidateImpact) {
+      this.currentStage = "ANALYZING";
 
-      /**
-       * IMPORTANT:
-       *
-       * Store the maximum jerk across the
-       * entire event rather than using the
-       * final sample's jerk.
-       */
       if (
-        jerk >
-        this.eventMaxJerk
+        jerk > this.eventMaxJerk
       ) {
-        this.eventMaxJerk =
-          jerk;
+        this.eventMaxJerk = jerk;
       }
 
       const elapsed =
         now -
         this.candidateImpactTime;
 
-      // ========================================
-      // ANALYSIS COMPLETE
-      // ========================================
+      // ----------------------------------------
+      // FINISH EVENT ANALYSIS
+      // ----------------------------------------
 
       if (
         elapsed >=
@@ -239,6 +167,10 @@ class FallDetectionService {
 
         this.lastFallScore =
           fallScore;
+
+        // Persist completed event values
+        this.lastEventMaxJerk =
+          this.eventMaxJerk;
 
         console.log(
           "Fall Detection Analysis:",
@@ -259,8 +191,8 @@ class FallDetectionService {
                 2
               ),
 
-            lastJerk:
-              this.lastJerk.toFixed(
+            postRotation:
+              this.lastPostImpactRotation.toFixed(
                 2
               ),
           }
@@ -280,6 +212,8 @@ class FallDetectionService {
             fallScore.toFixed(3)
           );
 
+          // IMPORTANT:
+          // Keep FALL_CONFIRMED visible.
           this.currentStage =
             "FALL_CONFIRMED";
 
@@ -287,12 +221,6 @@ class FallDetectionService {
             now +
             this.COOLDOWN_TIME;
 
-          /**
-           * Clear only the ACTIVE event.
-           *
-           * Keep diagnostic evidence so the UI
-           * can still show what happened.
-           */
           this.resetActiveEvent();
 
           return true;
@@ -324,42 +252,22 @@ class FallDetectionService {
     // ==========================================
 
     if (
-      now <
-      this.cooldownUntil
+      now < this.cooldownUntil
     ) {
       return false;
     }
 
     // ==========================================
-    // CANDIDATE IMPACT DETECTION
+    // PRE-IMPACT EVIDENCE
     // ==========================================
 
     const hasPreImpactDrop =
       this.hasRecentLowAcceleration();
 
-    /**
-     * We deliberately do NOT use a simple
-     * "rapid acceleration change" condition here.
-     *
-     * The previous implementation allowed:
-     *
-     *   high acceleration
-     *   +
-     *   sudden change
-     *
-     * to create a candidate.
-     *
-     * That caused ordinary movement to trigger
-     * false candidates.
-     *
-     * A candidate now needs either:
-     *
-     *   1. meaningful pre-impact acceleration drop
-     *
-     * OR
-     *
-     *   2. sufficiently high jerk.
-     */
+    // ==========================================
+    // POSSIBLE IMPACT
+    // ==========================================
+
     const possibleImpact =
       magnitude >=
         this.IMPACT_THRESHOLD &&
@@ -369,9 +277,11 @@ class FallDetectionService {
           this.HIGH_JERK_START
       );
 
-    if (
-      possibleImpact
-    ) {
+    // ==========================================
+    // START CANDIDATE EVENT
+    // ==========================================
+
+    if (possibleImpact) {
       this.candidateImpact =
         true;
 
@@ -381,19 +291,12 @@ class FallDetectionService {
       this.candidateImpactMagnitude =
         magnitude;
 
-      /**
-       * Preserve the event for diagnostics.
-       */
       this.lastImpactDetected =
         true;
 
       this.lastImpactMagnitude =
         magnitude;
 
-      /**
-       * Start maximum jerk tracking
-       * from this event.
-       */
       this.eventMaxJerk =
         jerk;
 
@@ -409,6 +312,11 @@ class FallDetectionService {
           jerk:
             jerk.toFixed(2),
 
+          rotation:
+            rotationMagnitude.toFixed(
+              2
+            ),
+
           preImpactDrop:
             hasPreImpactDrop,
         }
@@ -418,18 +326,26 @@ class FallDetectionService {
     }
 
     // ==========================================
-    // NORMAL MONITORING
+    // NORMAL / MONITORING
     // ==========================================
 
+    // Do NOT overwrite FALL_CONFIRMED
+    // immediately after an event.
+
     if (
-      magnitude <
-      this.FREE_FALL_THRESHOLD
+      this.currentStage !==
+      "FALL_CONFIRMED"
     ) {
-      this.currentStage =
-        "MONITORING";
-    } else {
-      this.currentStage =
-        "NORMAL";
+      if (
+        magnitude <
+        this.FREE_FALL_THRESHOLD
+      ) {
+        this.currentStage =
+          "MONITORING";
+      } else {
+        this.currentStage =
+          "NORMAL";
+      }
     }
 
     return false;
@@ -441,11 +357,13 @@ class FallDetectionService {
 
   private addSample(
     time: number,
-    magnitude: number
+    magnitude: number,
+    rotation: number
   ): void {
-    this.accelerationBuffer.push({
+    this.motionBuffer.push({
       time,
       magnitude,
+      rotation,
     });
 
     const cutoff =
@@ -454,38 +372,33 @@ class FallDetectionService {
       this.POST_IMPACT_WINDOW -
       500;
 
-    this.accelerationBuffer =
-      this.accelerationBuffer.filter(
+    this.motionBuffer =
+      this.motionBuffer.filter(
         (sample) =>
-          sample.time >=
-          cutoff
+          sample.time >= cutoff
       );
   }
 
- 
-
   // ==========================================
-  // JERK
+  // JERK CALCULATION
   // ==========================================
 
   private calculateCurrentJerk(): number {
     if (
-      this.accelerationBuffer.length <
+      this.motionBuffer.length <
       2
     ) {
       return 0;
     }
 
     const current =
-      this.accelerationBuffer[
-        this.accelerationBuffer.length -
-          1
+      this.motionBuffer[
+        this.motionBuffer.length - 1
       ];
 
     const previous =
-      this.accelerationBuffer[
-        this.accelerationBuffer.length -
-          2
+      this.motionBuffer[
+        this.motionBuffer.length - 2
       ];
 
     const deltaTime =
@@ -503,31 +416,29 @@ class FallDetectionService {
       Math.abs(
         current.magnitude -
           previous.magnitude
-      ) /
-      deltaTime
+      ) / deltaTime
     );
   }
 
   // ==========================================
-  // PRE-IMPACT ANALYSIS
+  // PRE-IMPACT LOW ACCELERATION
   // ==========================================
 
   private hasRecentLowAcceleration(): boolean {
     if (
-      this.accelerationBuffer.length ===
+      this.motionBuffer.length ===
       0
     ) {
       return false;
     }
 
     const now =
-      this.accelerationBuffer[
-        this.accelerationBuffer.length -
-          1
+      this.motionBuffer[
+        this.motionBuffer.length - 1
       ].time;
 
     const recent =
-      this.accelerationBuffer.filter(
+      this.motionBuffer.filter(
         (sample) =>
           sample.time >=
           now -
@@ -542,45 +453,49 @@ class FallDetectionService {
   }
 
   // ==========================================
-  // FALL SCORE
+  // FALL SCORE CALCULATION
   // ==========================================
 
   private calculateFallScore(): number {
     const impactTime =
       this.candidateImpactTime;
 
+    // ------------------------------------------
+    // PRE-IMPACT SAMPLES
+    // ------------------------------------------
+
     const preImpactSamples =
-      this.accelerationBuffer.filter(
+      this.motionBuffer.filter(
         (sample) =>
           sample.time >=
             impactTime -
               this.PRE_IMPACT_WINDOW &&
-          sample.time <
-            impactTime
+          sample.time < impactTime
       );
 
+    // ------------------------------------------
+    // POST-IMPACT SAMPLES
+    // ------------------------------------------
+
     const postImpactSamples =
-      this.accelerationBuffer.filter(
+      this.motionBuffer.filter(
         (sample) =>
-          sample.time >
-            impactTime &&
+          sample.time > impactTime &&
           sample.time <=
             impactTime +
               this.POST_IMPACT_WINDOW
       );
 
     if (
-      preImpactSamples.length ===
-        0 ||
-      postImpactSamples.length ===
-        0
+      preImpactSamples.length === 0 ||
+      postImpactSamples.length === 0
     ) {
       return 0;
     }
 
-    // ========================================
-    // FEATURE 1: IMPACT
-    // ========================================
+    // ==========================================
+    // IMPACT SCORE
+    // ==========================================
 
     const impactScore =
       this.normalize(
@@ -589,9 +504,9 @@ class FallDetectionService {
         32
       );
 
-    // ========================================
-    // FEATURE 2: PRE-IMPACT DROP
-    // ========================================
+    // ==========================================
+    // PRE-IMPACT DROP SCORE
+    // ==========================================
 
     const preImpactMinimum =
       Math.min(
@@ -615,16 +530,10 @@ class FallDetectionService {
         5
       );
 
-    // ========================================
-    // FEATURE 3: MAX EVENT JERK
-    // ========================================
+    // ==========================================
+    // JERK SCORE
+    // ==========================================
 
-    /**
-     * IMPORTANT:
-     *
-     * We now use eventMaxJerk instead of
-     * lastJerk.
-     */
     const jerkScore =
       this.normalize(
         this.eventMaxJerk,
@@ -632,9 +541,9 @@ class FallDetectionService {
         this.HIGH_JERK_FULL
       );
 
-    // ========================================
-    // FEATURE 4: POST-IMPACT RESPONSE
-    // ========================================
+    // ==========================================
+    // POST-IMPACT ACCELERATION STABILITY
+    // ==========================================
 
     const postMagnitudes =
       postImpactSamples.map(
@@ -647,10 +556,6 @@ class FallDetectionService {
         postMagnitudes
       );
 
-    /**
-     * Lower post-impact variation indicates
-     * settling/inactivity.
-     */
     const postImpactStability =
       1 -
       this.normalize(
@@ -659,9 +564,10 @@ class FallDetectionService {
         8
       );
 
-    /**
-     * Look at the final 400 ms of the event.
-     */
+    // ==========================================
+    // FINAL STABILITY
+    // ==========================================
+
     const finalWindowStart =
       impactTime +
       this.POST_IMPACT_WINDOW -
@@ -699,49 +605,87 @@ class FallDetectionService {
 
     const postImpactScore =
       this.clamp(
-        finalStability * 0.7 +
+        finalStability *
+          0.7 +
           postImpactStability *
             0.3,
         0,
         1
       );
 
-    // ========================================
-    // FINAL WEIGHTED SCORE
-    // ========================================
+    // ==========================================
+    // POST-IMPACT ROTATION
+    // ==========================================
+
+    const finalRotationSamples =
+      finalSamples.length > 0
+        ? finalSamples
+        : postImpactSamples;
+
+    const averageRotation =
+      this.mean(
+        finalRotationSamples.map(
+          (sample) =>
+            sample.rotation
+        )
+      );
+
+    this.lastPostImpactRotation =
+      averageRotation;
+
+    const rotationStability =
+      1 -
+      this.normalize(
+        averageRotation,
+        this.STABLE_ROTATION,
+        this.UNSTABLE_ROTATION
+      );
+
+    // ==========================================
+    // COMBINED FALL SCORE
+    // ==========================================
 
     let score =
       impactScore *
         this.IMPACT_WEIGHT +
+
       preImpactScore *
         this.PRE_IMPACT_WEIGHT +
+
       jerkScore *
         this.JERK_WEIGHT +
-      postImpactScore *
-        this.POST_IMPACT_WEIGHT;
 
-    /**
-     * IMPORTANT SAFETY RULE:
-     *
-     * A high score should not be possible from
-     * impact + stability alone.
-     *
-     * Require meaningful evidence from either:
-     *
-     *   - pre-impact drop
-     *   OR
-     *   - strong jerk
-     *
-     * before allowing a confirmation.
-     */
+      postImpactScore *
+        this.POST_IMPACT_WEIGHT +
+
+      rotationStability *
+        this.ROTATION_WEIGHT;
+
+    // ==========================================
+    // TEMPORAL EVIDENCE
+    // ==========================================
+
     const temporalEvidence =
-      preImpactScore >= 0.25 ||
-      jerkScore >= 0.50;
+      preImpactScore >=
+        0.25 ||
+      jerkScore >=
+        0.50;
 
     if (
       !temporalEvidence
     ) {
       score *= 0.55;
+    }
+
+    // ==========================================
+    // ROTATION PENALTY
+    // ==========================================
+
+    if (
+      averageRotation >
+      this.UNSTABLE_ROTATION
+    ) {
+      score *= 0.65;
     }
 
     return this.clamp(
@@ -752,7 +696,7 @@ class FallDetectionService {
   }
 
   // ==========================================
-  // MATH HELPERS
+  // NORMALIZE
   // ==========================================
 
   private normalize(
@@ -774,6 +718,10 @@ class FallDetectionService {
     );
   }
 
+  // ==========================================
+  // CLAMP
+  // ==========================================
+
   private clamp(
     value: number,
     min: number,
@@ -787,6 +735,10 @@ class FallDetectionService {
       max
     );
   }
+
+  // ==========================================
+  // MEAN
+  // ==========================================
 
   private mean(
     values: number[]
@@ -802,10 +754,13 @@ class FallDetectionService {
         (sum, value) =>
           sum + value,
         0
-      ) /
-      values.length
+      ) / values.length
     );
   }
+
+  // ==========================================
+  // STANDARD DEVIATION
+  // ==========================================
 
   private standardDeviation(
     values: number[]
@@ -854,31 +809,21 @@ class FallDetectionService {
       jerk:
         this.lastJerk,
 
-      /**
-       * Maximum jerk from the active event.
-       */
       eventMaxJerk:
         this.eventMaxJerk,
+
+      lastEventMaxJerk:
+        this.lastEventMaxJerk,
 
       fallScore:
         this.lastFallScore,
 
-      /**
-       * Current active candidate.
-       */
       candidateImpact:
         this.candidateImpact,
 
-      /**
-       * Persistent evidence that an impact
-       * was detected recently.
-       */
       lastImpactDetected:
         this.lastImpactDetected,
 
-      /**
-       * Persistent last impact magnitude.
-       */
       candidateImpactMagnitude:
         this.candidateImpact
           ? this.candidateImpactMagnitude
@@ -887,8 +832,11 @@ class FallDetectionService {
       lastImpactMagnitude:
         this.lastImpactMagnitude,
 
+      postImpactRotation:
+        this.lastPostImpactRotation,
+
       bufferSize:
-        this.accelerationBuffer.length,
+        this.motionBuffer.length,
     };
   }
 
@@ -915,8 +863,7 @@ class FallDetectionService {
   // ==========================================
 
   reset(): void {
-    this.accelerationBuffer =
-      [];
+    this.motionBuffer = [];
 
     this.candidateImpact =
       false;
@@ -934,6 +881,12 @@ class FallDetectionService {
       false;
 
     this.lastImpactMagnitude =
+      0;
+
+    this.lastEventMaxJerk =
+      0;
+
+    this.lastPostImpactRotation =
       0;
 
     this.cooldownUntil =

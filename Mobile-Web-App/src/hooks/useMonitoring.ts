@@ -3,6 +3,7 @@ import { useCallback, useState } from "react";
 import MonitoringService from "../services/MonitoringService";
 import SensorService from "../services/SensorService";
 import FallDetectionService from "../services/FallDetectionService";
+import EmergencyService from "../services/EmergencyService";
 
 import type {
   MotionSensorData,
@@ -17,21 +18,36 @@ export default function useMonitoring() {
   const [isMonitoring, setIsMonitoring] =
     useState(false);
 
-  const [sensor, setSensor] =
-    useState<MotionSensorData | null>(null);
-
-  const [location, setLocation] =
-    useState<GPSData | null>(null);
-
   const [status, setStatus] = useState(
     "Monitoring Inactive"
   );
+
+  // ==========================================
+  // EMERGENCY STATE
+  // ==========================================
+
+  const [fallDetected, setFallDetected] =
+    useState(false);
 
   const [emergency, setEmergency] =
     useState(false);
 
   // ==========================================
-  // FALL DETECTION DIAGNOSTICS
+  // SENSOR DATA
+  // ==========================================
+
+  const [sensor, setSensor] =
+    useState<MotionSensorData | null>(null);
+
+  // ==========================================
+  // GPS DATA
+  // ==========================================
+
+  const [location, setLocation] =
+    useState<GPSData | null>(null);
+
+  // ==========================================
+  // FALL DIAGNOSTICS
   // ==========================================
 
   const [fallDiagnostics, setFallDiagnostics] =
@@ -46,6 +62,40 @@ export default function useMonitoring() {
   const startMonitoring = useCallback(
     async () => {
       console.log(
+        "▶ Starting monitoring..."
+      );
+
+      /*
+       * IMPORTANT:
+       * Completely reset any previous emergency
+       * state before starting a new monitoring
+       * session.
+       */
+      EmergencyService.reset();
+
+      MonitoringService.reset();
+
+      FallDetectionService.reset();
+
+      setFallDetected(false);
+      setEmergency(false);
+
+      setSensor(null);
+      setLocation(null);
+
+      setFallDiagnostics(
+        FallDetectionService.getDiagnostics()
+      );
+
+      setStatus(
+        "Starting Monitoring..."
+      );
+
+      // ========================================
+      // REQUEST MOTION PERMISSION
+      // ========================================
+
+      console.log(
         "Requesting motion permission..."
       );
 
@@ -53,6 +103,15 @@ export default function useMonitoring() {
         await SensorService.requestPermission();
 
       if (!permissionGranted) {
+        console.warn(
+          "❌ Motion permission denied."
+        );
+
+        setIsMonitoring(false);
+
+        setFallDetected(false);
+        setEmergency(false);
+
         setStatus(
           "Motion Permission Denied"
         );
@@ -61,24 +120,34 @@ export default function useMonitoring() {
       }
 
       console.log(
-        "Permission granted."
+        "✅ Motion permission granted."
       );
+
+      // ========================================
+      // START MONITORING SERVICE
+      // ========================================
 
       const started =
         await MonitoringService.start(
           // ====================================
-          // EMERGENCY CALLBACK
+          // FALL CALLBACK
           // ====================================
 
           () => {
             console.log(
-              "Emergency detected."
+              "⚠️ Possible fall detected."
             );
 
-            setEmergency(true);
+            /*
+             * Do NOT immediately set emergency.
+             *
+             * HomePage will start the
+             * 10-second emergency countdown.
+             */
+            setFallDetected(true);
 
             setStatus(
-              "Emergency Detected"
+              "Possible Fall Detected"
             );
           },
 
@@ -86,24 +155,15 @@ export default function useMonitoring() {
           // SENSOR CALLBACK
           // ====================================
 
-          (sensorData) => {
-            console.log(
-              "Motion Sensor:",
+          (sensorData: MotionSensorData) => {
+            setSensor(
               sensorData
             );
 
-            setSensor(sensorData);
-
-            // Get latest fall detection state
             const diagnostics =
               FallDetectionService.getDiagnostics();
 
             setFallDiagnostics(
-              diagnostics
-            );
-
-            console.log(
-              "Fall Detection Diagnostics:",
               diagnostics
             );
           },
@@ -112,29 +172,160 @@ export default function useMonitoring() {
           // GPS CALLBACK
           // ====================================
 
-          (gpsData) => {
-            console.log(
-              "GPS:",
+          (gpsData: GPSData) => {
+            setLocation(
               gpsData
             );
-
-            setLocation(gpsData);
           }
         );
 
+      // ========================================
+      // START RESULT
+      // ========================================
+
       if (started) {
+        console.log(
+          "✅ Monitoring active."
+        );
+
         setIsMonitoring(true);
+
+        /*
+         * Make sure a clean monitoring
+         * session starts without an old
+         * emergency.
+         */
+        setFallDetected(false);
+        setEmergency(false);
 
         setStatus(
           "Monitoring Active"
         );
-      } else {
-        setStatus(
-          "Failed to Start"
-        );
+
+        return;
       }
+
+      // ========================================
+      // MONITORING FAILED
+      // ========================================
+
+      console.warn(
+        "❌ Monitoring failed to start."
+      );
+
+      EmergencyService.reset();
+
+      MonitoringService.stop();
+
+      FallDetectionService.reset();
+
+      setIsMonitoring(false);
+
+      setFallDetected(false);
+      setEmergency(false);
+
+      setSensor(null);
+      setLocation(null);
+
+      setFallDiagnostics(
+        FallDetectionService.getDiagnostics()
+      );
+
+      setStatus(
+        "Failed to Start"
+      );
     },
     []
+  );
+
+  // ==========================================
+  // CONFIRM EMERGENCY
+  // ==========================================
+
+  const confirmEmergency = useCallback(
+    () => {
+      /*
+       * Emergency confirmation should only
+       * happen while monitoring is active.
+       */
+      if (!MonitoringService.running) {
+        console.warn(
+          "⚠️ Emergency confirmation ignored because monitoring is inactive."
+        );
+
+        return;
+      }
+
+      console.log(
+        "🚨 Emergency confirmed."
+      );
+
+      setFallDetected(false);
+
+      setEmergency(true);
+
+      setStatus(
+        "Emergency Detected"
+      );
+    },
+    []
+  );
+
+  // ==========================================
+  // CANCEL FALL / EMERGENCY
+  // ==========================================
+
+  const cancelFallAlert = useCallback(
+    () => {
+      console.log(
+        "🟢 Fall alert cancelled."
+      );
+
+      /*
+       * Stop any emergency countdown.
+       */
+      EmergencyService.cancel();
+
+      setFallDetected(false);
+
+      setEmergency(false);
+
+      setStatus(
+        isMonitoring
+          ? "Monitoring Active"
+          : "Monitoring Inactive"
+      );
+    },
+    [isMonitoring]
+  );
+
+  // ==========================================
+  // CLEAR EMERGENCY
+  // ==========================================
+
+  const clearEmergency = useCallback(
+    () => {
+      console.log(
+        "Clearing emergency state."
+      );
+
+      /*
+       * Make sure no countdown remains
+       * active.
+       */
+      EmergencyService.reset();
+
+      setEmergency(false);
+
+      setFallDetected(false);
+
+      setStatus(
+        isMonitoring
+          ? "Monitoring Active"
+          : "Monitoring Inactive"
+      );
+    },
+    [isMonitoring]
   );
 
   // ==========================================
@@ -143,11 +334,33 @@ export default function useMonitoring() {
 
   const stopMonitoring = useCallback(
     () => {
+      console.log(
+        "🛑 Stopping monitoring..."
+      );
+
+      /*
+       * IMPORTANT:
+       * Stop emergency countdown FIRST.
+       */
+      EmergencyService.reset();
+
+      /*
+       * Stop sensor/GPS monitoring.
+       */
       MonitoringService.stop();
 
+      /*
+       * Reset fall detection.
+       */
       FallDetectionService.reset();
 
+      // ========================================
+      // RESET REACT STATE
+      // ========================================
+
       setIsMonitoring(false);
+
+      setFallDetected(false);
 
       setEmergency(false);
 
@@ -159,17 +372,19 @@ export default function useMonitoring() {
 
       setLocation(null);
 
-      // Get the actual reset state
-      // directly from FallDetectionService
       setFallDiagnostics(
         FallDetectionService.getDiagnostics()
+      );
+
+      console.log(
+        "✅ Monitoring stopped."
       );
     },
     []
   );
 
   // ==========================================
-  // RETURN DATA TO UI
+  // RETURN
   // ==========================================
 
   return {
@@ -178,14 +393,23 @@ export default function useMonitoring() {
     // ----------------------------------------
 
     isMonitoring,
+
     status,
+
+    // ----------------------------------------
+    // Fall / Emergency
+    // ----------------------------------------
+
+    fallDetected,
+
     emergency,
 
     // ----------------------------------------
-    // Raw data
+    // Raw sensor data
     // ----------------------------------------
 
     sensor,
+
     location,
 
     // ----------------------------------------
@@ -241,7 +465,7 @@ export default function useMonitoring() {
       null,
 
     // ----------------------------------------
-    // NEW FALL DETECTION DIAGNOSTICS
+    // Fall Diagnostics
     // ----------------------------------------
 
     fallStage:
@@ -268,11 +492,22 @@ export default function useMonitoring() {
     fallBufferSize:
       fallDiagnostics.bufferSize,
 
+    lastEventMaxJerk:
+      fallDiagnostics.lastEventMaxJerk ??
+      0,
+
     // ----------------------------------------
     // Controls
     // ----------------------------------------
 
     startMonitoring,
+
     stopMonitoring,
+
+    confirmEmergency,
+
+    cancelFallAlert,
+
+    clearEmergency,
   };
 }

@@ -8,6 +8,10 @@ import type {
 } from "../types/sensor";
 
 class MonitoringService {
+  // ==========================================
+  // CALLBACKS
+  // ==========================================
+
   private emergencyCallback?: () => void;
 
   private sensorCallback?: (
@@ -18,11 +22,25 @@ class MonitoringService {
     data: GPSData
   ) => void;
 
+  // ==========================================
+  // LATEST DATA
+  // ==========================================
+
   private latestSensor:
     MotionSensorData | null = null;
 
   private latestLocation:
     GPSData | null = null;
+
+  // ==========================================
+  // MONITORING STATE
+  // ==========================================
+
+  private isRunning = false;
+
+  // ==========================================
+  // START MONITORING
+  // ==========================================
 
   async start(
     onEmergency?: () => void,
@@ -33,10 +51,20 @@ class MonitoringService {
       data: GPSData
     ) => void
   ): Promise<boolean> {
+    // Prevent duplicate monitoring
+    if (this.isRunning) {
+      console.log(
+        "MonitoringService is already running."
+      );
+
+      return true;
+    }
+
     console.log(
-      "MonitoringService started."
+      "Starting MonitoringService..."
     );
 
+    // Store callbacks
     this.emergencyCallback =
       onEmergency;
 
@@ -47,35 +75,56 @@ class MonitoringService {
       onLocationUpdate;
 
     // ==========================================
-    // SENSOR MONITORING
+    // RESET FALL DETECTION
+    // ==========================================
+
+    FallDetectionService.reset();
+
+    // ==========================================
+    // START SENSOR SERVICE
     // ==========================================
 
     const sensorStarted =
       await SensorService.start(
         (data: MotionSensorData) => {
-          // Store latest sensor data
+          // ------------------------------------
+          // STORE LATEST SENSOR DATA
+          // ------------------------------------
+
           this.latestSensor = data;
 
-          // Send sensor data to UI
+          // ------------------------------------
+          // SEND DATA TO UI
+          // ------------------------------------
+
           this.sensorCallback?.(data);
 
-          // ========================================
+          // ------------------------------------
           // FALL DETECTION
-          // ========================================
+          // ------------------------------------
 
-          if (
+          const fallDetected =
             FallDetectionService.detectFall(
               data
-            )
-          ) {
+            );
+
+          // ------------------------------------
+          // CONFIRMED FALL
+          // ------------------------------------
+
+          if (fallDetected) {
             console.log(
-              "Fall detected by MonitoringService."
+              "🚨 Fall confirmed by MonitoringService."
             );
 
             this.emergencyCallback?.();
           }
         }
       );
+
+    // ==========================================
+    // SENSOR START FAILED
+    // ==========================================
 
     if (!sensorStarted) {
       console.warn(
@@ -86,13 +135,21 @@ class MonitoringService {
     }
 
     // ==========================================
-    // GPS MONITORING
+    // START GPS SERVICE
     // ==========================================
 
     const locationStarted =
       await LocationService.start(
-        (data) => {
+        (data: GPSData) => {
+          // ------------------------------------
+          // STORE LATEST LOCATION
+          // ------------------------------------
+
           this.latestLocation = data;
+
+          // ------------------------------------
+          // SEND LOCATION TO UI
+          // ------------------------------------
 
           this.locationCallback?.(
             data
@@ -100,11 +157,23 @@ class MonitoringService {
         }
       );
 
+    // GPS failure should NOT stop motion
+    // monitoring from working.
     if (!locationStarted) {
       console.warn(
-        "Failed to start LocationService."
+        "GPS could not be started."
       );
     }
+
+    // ==========================================
+    // MONITORING ACTIVE
+    // ==========================================
+
+    this.isRunning = true;
+
+    console.log(
+      "✅ MonitoringService started successfully."
+    );
 
     return true;
   }
@@ -115,15 +184,50 @@ class MonitoringService {
 
   stop(): void {
     console.log(
-      "MonitoringService stopped."
+      "Stopping MonitoringService..."
     );
 
+    // Stop sensors
     SensorService.stop();
+
+    // Stop GPS
     LocationService.stop();
+
+    // Reset fall detector
+    FallDetectionService.reset();
+
+    // Reset monitoring state
+    this.isRunning = false;
+
+    // Clear callbacks
+    this.emergencyCallback =
+      undefined;
+
+    this.sensorCallback =
+      undefined;
+
+    this.locationCallback =
+      undefined;
+
+    // Clear latest data
+    this.latestSensor = null;
+    this.latestLocation = null;
+
+    console.log(
+      "MonitoringService stopped."
+    );
   }
 
   // ==========================================
-  // GET LATEST SENSOR DATA
+  // MONITORING STATUS
+  // ==========================================
+
+  get running(): boolean {
+    return this.isRunning;
+  }
+
+  // ==========================================
+  // LATEST SENSOR DATA
   // ==========================================
 
   getLatestSensor():
@@ -132,7 +236,7 @@ class MonitoringService {
   }
 
   // ==========================================
-  // GET LATEST LOCATION
+  // LATEST GPS LOCATION
   // ==========================================
 
   getLatestLocation():
@@ -147,6 +251,12 @@ class MonitoringService {
   reset(): void {
     this.latestSensor = null;
     this.latestLocation = null;
+
+    FallDetectionService.reset();
+
+    console.log(
+      "MonitoringService reset."
+    );
   }
 }
 

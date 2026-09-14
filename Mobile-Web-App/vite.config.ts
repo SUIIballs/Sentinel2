@@ -12,5 +12,13 @@ export default defineConfig({
     host: true,
     port: 5173,
     strictPort: true,
+
+    proxy: {
+      "/api": {
+        target: "http://192.168.1.6:5000",
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
 });
