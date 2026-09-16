@@ -22,48 +22,42 @@ class EmergencyService {
 
   private emergencyActive = false;
 
-  // ==========================================
-  // START COUNTDOWN
-  // ==========================================
+  private emergencyCompleted = false;
 
   startCountdown(
     onTick: (seconds: number) => void,
     onFinish: () => void,
     duration = 10
   ): void {
-    /*
-     * Always stop an existing countdown
-     * before starting a new one.
-     */
+    if (this.emergencyActive) {
+      console.log(
+        "⚠️ Emergency already active. Countdown not started."
+      );
+
+      return;
+    }
+
     this.stop();
 
     this.duration = duration;
-
     this.secondsRemaining = duration;
 
     this.tickCallback = onTick;
-
     this.finishCallback = onFinish;
+
+    this.emergencyCompleted = false;
 
     console.log(
       "⚠️ Emergency countdown started:",
       duration
     );
 
-    /*
-     * Immediately display the starting
-     * countdown value.
-     */
     this.tickCallback?.(
       this.secondsRemaining
     );
 
     this.timer = window.setInterval(
       () => {
-        /*
-         * Safety check:
-         * if the timer was stopped, do nothing.
-         */
         if (this.timer === null) {
           return;
         }
@@ -79,26 +73,14 @@ class EmergencyService {
           this.secondsRemaining
         );
 
-        /*
-         * Countdown finished.
-         */
         if (
           this.secondsRemaining <= 0
         ) {
-          /*
-           * Save the callback before stopping.
-           */
           const finishCallback =
             this.finishCallback;
 
-          /*
-           * Stop the timer immediately.
-           */
           this.stop();
 
-          /*
-           * Process emergency asynchronously.
-           */
           void this.completeEmergency(
             finishCallback
           );
@@ -108,39 +90,30 @@ class EmergencyService {
     );
   }
 
-  // ==========================================
-  // COMPLETE EMERGENCY
-  // ==========================================
-
   private async completeEmergency(
     finishCallback?: () => void
   ): Promise<void> {
-    /*
-     * Trigger the emergency and wait for
-     * GPS/history/backend processing.
-     */
+    if (this.emergencyCompleted) {
+      console.log(
+        "⚠️ Emergency already completed. Duplicate alert prevented."
+      );
+
+      return;
+    }
+
     await this.triggerEmergency();
 
-    /*
-     * Only notify HomePage if the emergency
-     * wasn't cancelled/reset during processing.
-     */
     if (this.emergencyActive) {
+      this.emergencyCompleted = true;
+
       finishCallback?.();
     }
   }
 
-  // ==========================================
-  // TRIGGER EMERGENCY
-  // ==========================================
-
   async triggerEmergency(): Promise<void> {
-    /*
-     * Prevent duplicate emergency processing.
-     */
     if (this.emergencyActive) {
       console.log(
-        "Emergency already active."
+        "⚠️ Emergency already active. Duplicate trigger prevented."
       );
 
       return;
@@ -151,10 +124,6 @@ class EmergencyService {
     );
 
     this.emergencyActive = true;
-
-    // ========================================
-    // GET GPS
-    // ========================================
 
     let gps =
       MonitoringService.getLatestLocation();
@@ -169,37 +138,23 @@ class EmergencyService {
       gps
     );
 
-    // ========================================
-    // SAVE TO HISTORY
-    // ========================================
-
     HistoryService.addIncident({
       id: crypto.randomUUID(),
-
       timestamp: Date.now(),
-
       latitude:
         gps?.latitude ?? 0,
-
       longitude:
         gps?.longitude ?? 0,
-
       accuracy:
         gps?.accuracy ?? 0,
-
       reason:
         "Fall Detected",
-
       cancelled: false,
     });
 
     console.log(
       "📋 Emergency incident saved."
     );
-
-    // ========================================
-    // SEND BACKEND ALERT
-    // ========================================
 
     if (gps) {
       console.log(
@@ -214,11 +169,11 @@ class EmergencyService {
 
       if (alertSent) {
         console.log(
-          "✅ Emergency alert sent to backend."
+          "✅ Emergency alert sent to all configured contacts."
         );
       } else {
         console.warn(
-          "⚠️ Emergency alert could not be sent to backend."
+          "⚠️ One or more emergency alerts could not be sent."
         );
       }
     } else {
@@ -227,27 +182,26 @@ class EmergencyService {
       );
     }
 
-    // ========================================
-    // HISTORY LOG
-    // ========================================
-
     console.log(
       "History:",
       HistoryService.getIncidents()
     );
 
-    // ========================================
-    // TRIGGER CALLBACK
-    // ========================================
-
     this.triggerCallback?.();
   }
 
-  // ==========================================
-  // CANCEL
-  // ==========================================
-
   cancel(): void {
+    if (
+      this.timer === null &&
+      !this.emergencyActive
+    ) {
+      console.log(
+        "No active emergency to cancel."
+      );
+
+      return;
+    }
+
     console.log(
       "✅ Emergency cancelled by user."
     );
@@ -256,12 +210,10 @@ class EmergencyService {
 
     this.emergencyActive = false;
 
+    this.emergencyCompleted = false;
+
     this.cancelCallback?.();
   }
-
-  // ==========================================
-  // STOP COUNTDOWN
-  // ==========================================
 
   stop(): void {
     if (
@@ -278,10 +230,6 @@ class EmergencyService {
       this.duration;
   }
 
-  // ==========================================
-  // RESET EVERYTHING
-  // ==========================================
-
   reset(): void {
     console.log(
       "EmergencyService reset."
@@ -290,6 +238,8 @@ class EmergencyService {
     this.stop();
 
     this.emergencyActive = false;
+
+    this.emergencyCompleted = false;
 
     this.tickCallback =
       undefined;
@@ -307,10 +257,6 @@ class EmergencyService {
       this.duration;
   }
 
-  // ==========================================
-  // CALLBACKS
-  // ==========================================
-
   setTriggerCallback(
     callback: () => void
   ): void {
@@ -324,10 +270,6 @@ class EmergencyService {
     this.cancelCallback =
       callback;
   }
-
-  // ==========================================
-  // STATUS
-  // ==========================================
 
   isRunning(): boolean {
     return this.timer !== null;
