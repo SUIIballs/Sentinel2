@@ -44,7 +44,6 @@ const EmergencyAlertStatus = ({
           marginTop: "15px",
         }}
       >
-        {/* GPS */}
         <div>
           {getStatusIcon(
             locationAvailable
@@ -52,7 +51,6 @@ const EmergencyAlertStatus = ({
           GPS Location Captured
         </div>
 
-        {/* History */}
         <div>
           {getStatusIcon(
             emergency
@@ -60,7 +58,6 @@ const EmergencyAlertStatus = ({
           Emergency Incident Saved
         </div>
 
-        {/* Browser Notification */}
         <div>
           {getStatusIcon(
             notificationSent
@@ -68,24 +65,21 @@ const EmergencyAlertStatus = ({
           Browser Notification Triggered
         </div>
 
-        {/* Backend */}
         <div>
           {getStatusIcon(
             debug.backendSuccess
           )}{" "}
-          Backend Alert Received
+          Backend Alerts Received
         </div>
 
-        {/* SMS */}
         <div>
           {getStatusIcon(
             debug.smsSent
           )}{" "}
-          SMS Alert Simulated
+          SMS Alerts Simulated
         </div>
       </div>
 
-      {/* Backend details */}
       <div
         style={{
           marginTop: "20px",
@@ -94,10 +88,16 @@ const EmergencyAlertStatus = ({
           background: "#1f2937",
         }}
       >
-        <strong>
-          Alert Type:
-        </strong>{" "}
-        Fall Detected
+        <p
+          style={{
+            margin: 0,
+          }}
+        >
+          <strong>
+            Alert Type:
+          </strong>{" "}
+          Fall Detected
+        </p>
 
         {debug.httpStatus !== null && (
           <p
@@ -115,7 +115,6 @@ const EmergencyAlertStatus = ({
         )}
       </div>
 
-      {/* Error */}
       {debug.error && (
         <div
           style={{
@@ -143,7 +142,7 @@ const EmergencyAlertStatus = ({
           opacity: 0.8,
         }}
       >
-        SMS delivery is simulated for
+        SMS alerts are simulated for
         the current prototype.
       </p>
     </section>

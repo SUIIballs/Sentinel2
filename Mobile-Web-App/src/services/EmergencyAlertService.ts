@@ -14,7 +14,7 @@ export interface EmergencyDebugState {
 
 class EmergencyAlertService {
   private readonly backendUrl =
-  "/api/emergency/alert";
+    "/api/emergency/alert";
 
   private debugState: EmergencyDebugState = {
     serviceCalled: false,
@@ -54,173 +54,194 @@ class EmergencyAlertService {
       "🔥 EmergencyAlertService.sendEmergencyAlert() CALLED"
     );
 
-    this.debugState.serviceCalled = true;
+    this.debugState.serviceCalled =
+      true;
+
     this.debugState.error = null;
 
-    const contact =
-      EmergencyContactService.getContact();
+    const contacts =
+      EmergencyContactService.getContacts();
 
     console.log(
-      "📱 Emergency contact:",
-      contact
+      "📱 Emergency contacts:",
+      contacts
     );
 
-    if (!contact) {
+    if (contacts.length === 0) {
       console.warn(
-        "⚠️ No emergency contact configured."
+        "⚠️ No emergency contacts configured."
       );
 
-      this.debugState.contactFound = false;
+      this.debugState.contactFound =
+        false;
+
       this.debugState.error =
-        "No emergency contact configured.";
+        "No emergency contacts configured.";
 
       return false;
     }
 
-    this.debugState.contactFound = true;
+    this.debugState.contactFound =
+      true;
 
     if (!location) {
       console.warn(
         "⚠️ Emergency location unavailable."
       );
 
-      this.debugState.locationAvailable = false;
+      this.debugState.locationAvailable =
+        false;
+
       this.debugState.error =
         "Emergency location unavailable.";
 
       return false;
     }
 
-    this.debugState.locationAvailable = true;
+    this.debugState.locationAvailable =
+      true;
 
-    const payload = {
-      contact: {
-        name: contact.name,
-        phone: contact.phone,
-      },
+    this.debugState.requestStarted =
+      true;
 
-      latitude: location.latitude,
-      longitude: location.longitude,
-      accuracy: location.accuracy,
+    let allSuccessful = true;
+    let lastStatus: number | null =
+      null;
+    let anySmsSent = false;
 
-      reason,
+    for (const contact of contacts) {
+      const payload = {
+        contact: {
+          name: contact.name,
+          phone: contact.phone,
+        },
 
-      timestamp: Date.now(),
-    };
+        latitude:
+          location.latitude,
+        longitude:
+          location.longitude,
+        accuracy:
+          location.accuracy,
 
-    console.log(
-      "📤 Sending emergency alert to backend:"
-    );
+        reason,
 
-    console.log(
-      "Backend URL:",
-      this.backendUrl
-    );
-
-    console.log(
-      "Payload:",
-      payload
-    );
-
-    this.debugState.requestStarted = true;
-
-    try {
-      const response =
-        await fetch(
-          this.backendUrl,
-          {
-            method: "POST",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body:
-              JSON.stringify(payload),
-          }
-        );
+        timestamp: Date.now(),
+      };
 
       console.log(
-        "📡 Backend HTTP status:",
-        response.status
+        "📤 Sending emergency alert to:",
+        contact.name,
+        contact.phone
       );
 
-      this.debugState.httpStatus =
-        response.status;
+      try {
+        const response =
+          await fetch(
+            this.backendUrl,
+            {
+              method: "POST",
 
-      if (!response.ok) {
-        console.error(
-          "❌ Backend returned HTTP error:",
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body:
+                JSON.stringify(
+                  payload
+                ),
+            }
+          );
+
+        lastStatus =
+          response.status;
+
+        this.debugState.httpStatus =
+          response.status;
+
+        console.log(
+          "📡 Backend HTTP status:",
           response.status
         );
 
-        this.debugState.error =
-          `Backend HTTP error: ${response.status}`;
+        if (!response.ok) {
+          console.error(
+            "❌ Backend returned HTTP error:",
+            response.status
+          );
 
-        return false;
-      }
+          allSuccessful = false;
+          continue;
+        }
 
-      const data =
-        (await response.json()) as {
-          success: boolean;
-          message: string;
-          smsSent?: boolean;
-        };
+        const data =
+          (await response.json()) as {
+            success: boolean;
+            message: string;
+            smsSent?: boolean;
+          };
 
-      console.log(
-        "📥 Backend emergency response:",
-        data
-      );
-
-      if (!data.success) {
-        console.warn(
-          "⚠️ Backend rejected emergency alert."
-        );
-
-        this.debugState.backendSuccess =
-          false;
-
-        this.debugState.error =
-          "Backend rejected emergency alert.";
-
-        return false;
-      }
-
-      this.debugState.backendSuccess =
-        true;
-
-      this.debugState.smsSent =
-        data.smsSent === true;
-
-      if (data.smsSent) {
         console.log(
-          "✅ Mock SMS processed successfully."
+          "📥 Backend emergency response:",
+          data
         );
-      } else {
-        console.warn(
-          "⚠️ Backend response did not confirm mock SMS."
+
+        if (!data.success) {
+          console.warn(
+            "⚠️ Backend rejected emergency alert."
+          );
+
+          allSuccessful = false;
+          continue;
+        }
+
+        if (
+          data.smsSent === true
+        ) {
+          anySmsSent = true;
+
+          console.log(
+            "✅ Mock SMS processed successfully for:",
+            contact.name
+          );
+        }
+      } catch (error) {
+        console.error(
+          "❌ Failed to connect to emergency backend:",
+          error
         );
+
+        allSuccessful = false;
+
+        this.debugState.error =
+          error instanceof Error
+            ? error.message
+            : "Unknown network error.";
       }
+    }
 
-      console.log(
-        "✅ Emergency alert delivered to backend."
-      );
+    this.debugState.httpStatus =
+      lastStatus;
 
-      return true;
-    } catch (error) {
-      console.error(
-        "❌ Failed to connect to emergency backend:",
-        error
-      );
+    this.debugState.backendSuccess =
+      allSuccessful;
 
+    this.debugState.smsSent =
+      anySmsSent;
+
+    if (!allSuccessful) {
       this.debugState.error =
-        error instanceof Error
-          ? error.message
-          : "Unknown network error.";
+        this.debugState.error ??
+        "One or more emergency alerts failed.";
 
       return false;
     }
+
+    console.log(
+      "✅ Emergency alerts delivered to all configured contacts."
+    );
+
+    return true;
   }
 }
 

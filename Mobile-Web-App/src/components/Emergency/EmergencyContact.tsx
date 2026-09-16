@@ -1,12 +1,22 @@
 import { useState } from "react";
 
-import EmergencyContactService, {
-  type EmergencyContact as EmergencyContactData,
-} from "../../services/EmergencyContactService";
+import EmergencyContactService from "../../services/EmergencyContactService";
 
-const EmergencyContact = () => {
+interface EmergencyContactProps {
+  contactId?: string;
+  onSaved?: () => void;
+}
+
+const EmergencyContact = ({
+  contactId,
+  onSaved,
+}: EmergencyContactProps) => {
   const existingContact =
-    EmergencyContactService.getContact();
+    contactId
+      ? EmergencyContactService.getContact(
+          contactId
+        )
+      : null;
 
   const [name, setName] =
     useState(
@@ -23,6 +33,9 @@ const EmergencyContact = () => {
       !!existingContact
     );
 
+  const isEditing =
+    !!contactId;
+
   const handleSave = () => {
     if (
       !name.trim() ||
@@ -35,24 +48,50 @@ const EmergencyContact = () => {
       return;
     }
 
-    const contact: EmergencyContactData = {
-      name: name.trim(),
-      phone: phone.trim(),
-    };
+    if (isEditing && contactId) {
+      const updated =
+        EmergencyContactService.updateContact(
+          contactId,
+          {
+            name,
+            phone,
+          }
+        );
 
-    EmergencyContactService.saveContact(
-      contact
-    );
+      if (updated) {
+        setSaved(true);
+        onSaved?.();
+      }
+
+      return;
+    }
+
+    EmergencyContactService.saveContact({
+      name,
+      phone,
+    });
 
     setSaved(true);
+
+    onSaved?.();
   };
 
   const handleRemove = () => {
-    EmergencyContactService.removeContact();
+    if (
+      !contactId
+    ) {
+      return;
+    }
+
+    EmergencyContactService.removeContact(
+      contactId
+    );
 
     setName("");
     setPhone("");
     setSaved(false);
+
+    onSaved?.();
   };
 
   return (
@@ -63,7 +102,9 @@ const EmergencyContact = () => {
       }}
     >
       <h2>
-        Emergency Contact
+        {isEditing
+          ? "Edit Emergency Contact"
+          : "Emergency Contact"}
       </h2>
 
       <div
@@ -147,28 +188,31 @@ const EmergencyContact = () => {
               fontWeight: "bold",
             }}
           >
-            Save Contact
+            {isEditing
+              ? "Update Contact"
+              : "Save Contact"}
           </button>
 
-          {saved && (
-            <button
-              type="button"
-              onClick={
-                handleRemove
-              }
-              style={{
-                padding:
-                  "10px 18px",
-                borderRadius: "8px",
-                border: "none",
-                cursor: "pointer",
-                fontWeight:
-                  "bold",
-              }}
-            >
-              Remove
-            </button>
-          )}
+          {isEditing &&
+            saved && (
+              <button
+                type="button"
+                onClick={
+                  handleRemove
+                }
+                style={{
+                  padding:
+                    "10px 18px",
+                  borderRadius: "8px",
+                  border: "none",
+                  cursor: "pointer",
+                  fontWeight:
+                    "bold",
+                }}
+              >
+                Remove
+              </button>
+            )}
         </div>
 
         {saved && (

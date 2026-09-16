@@ -1,4 +1,7 @@
+import { useState } from "react";
+
 import EmergencyContactService from "../services/EmergencyContactService";
+import EmergencyContact from "../components/Emergency/EmergencyContact";
 
 interface EmergencyContactsPageProps {
   onBack: () => void;
@@ -9,14 +12,40 @@ const EmergencyContactsPage = ({
   onBack,
   onAddContact,
 }: EmergencyContactsPageProps) => {
-  const contact =
-    EmergencyContactService.getContact();
+  const [editingContactId, setEditingContactId] =
+    useState<string | null>(null);
+
+  const [refresh, setRefresh] =
+    useState(0);
+
+  const contacts =
+    EmergencyContactService.getContacts();
+
+  const handleRefresh = () => {
+    setRefresh(
+      (value) => value + 1
+    );
+
+    setEditingContactId(null);
+  };
+
+  const handleRemove = (
+    contactId: string
+  ) => {
+    EmergencyContactService.removeContact(
+      contactId
+    );
+
+    setRefresh(
+      (value) => value + 1
+    );
+  };
+
+  void refresh;
 
   return (
     <div className="app">
-
       <main className="main-content">
-
         <button
           type="button"
           onClick={onBack}
@@ -32,23 +61,27 @@ const EmergencyContactsPage = ({
         </button>
 
         <section className="diagnostics-card">
-
           <h2>
             Emergency Contacts
           </h2>
 
-          {!contact && (
+          {contacts.length === 0 && (
             <div
               style={{
                 marginTop: "20px",
-                padding: "16px",
+                padding: "20px",
                 borderRadius: "10px",
                 background: "#1f2937",
+                textAlign: "center",
               }}
             >
-              <p>
-                No emergency contact has been
-                added yet.
+              <p
+                style={{
+                  marginTop: 0,
+                }}
+              >
+                No emergency contacts
+                have been added yet.
               </p>
 
               <button
@@ -68,51 +101,164 @@ const EmergencyContactsPage = ({
             </div>
           )}
 
-          {contact && (
-            <div
-              style={{
-                marginTop: "20px",
-                padding: "18px",
-                borderRadius: "10px",
-                background: "#1f2937",
-              }}
-            >
-              <h3
+          {contacts.length > 0 && (
+            <>
+              <div
                 style={{
-                  marginTop: 0,
+                  display: "flex",
+                  justifyContent:
+                    "space-between",
+                  alignItems: "center",
+                  marginTop: "20px",
+                  marginBottom: "15px",
+                  gap: "10px",
+                  flexWrap: "wrap",
                 }}
               >
-                {contact.name}
-              </h3>
+                <p
+                  style={{
+                    margin: 0,
+                  }}
+                >
+                  {contacts.length}{" "}
+                  emergency contact
+                  {contacts.length !== 1
+                    ? "s"
+                    : ""}
+                </p>
 
-              <p>
-                <strong>
-                  Phone:
-                </strong>{" "}
-                {contact.phone}
-              </p>
+                <button
+                  type="button"
+                  onClick={onAddContact}
+                  style={{
+                    padding: "10px 16px",
+                    borderRadius: "8px",
+                    border: "none",
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                  }}
+                >
+                  + Add Contact
+                </button>
+              </div>
 
-              <button
-                type="button"
-                onClick={onAddContact}
+              <div
                 style={{
-                  marginTop: "8px",
-                  padding: "10px 16px",
-                  borderRadius: "8px",
-                  border: "none",
-                  cursor: "pointer",
-                  fontWeight: "bold",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
                 }}
               >
-                Edit Contact
-              </button>
-            </div>
+                {contacts.map(
+                  (contact) => (
+                    <div
+                      key={contact.id}
+                      style={{
+                        padding: "18px",
+                        borderRadius: "10px",
+                        background:
+                          "#1f2937",
+                      }}
+                    >
+                      {editingContactId ===
+                      contact.id ? (
+                        <EmergencyContact
+                          contactId={
+                            contact.id
+                          }
+                          onSaved={
+                            handleRefresh
+                          }
+                        />
+                      ) : (
+                        <>
+                          <h3
+                            style={{
+                              marginTop: 0,
+                              marginBottom:
+                                "8px",
+                            }}
+                          >
+                            {contact.name}
+                          </h3>
+
+                          <p
+                            style={{
+                              margin:
+                                "0 0 15px",
+                            }}
+                          >
+                            <strong>
+                              Phone:
+                            </strong>{" "}
+                            {contact.phone}
+                          </p>
+
+                          <div
+                            style={{
+                              display:
+                                "flex",
+                              gap: "10px",
+                              flexWrap:
+                                "wrap",
+                            }}
+                          >
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setEditingContactId(
+                                  contact.id
+                                )
+                              }
+                              style={{
+                                padding:
+                                  "9px 16px",
+                                borderRadius:
+                                  "8px",
+                                border:
+                                  "none",
+                                cursor:
+                                  "pointer",
+                                fontWeight:
+                                  "bold",
+                              }}
+                            >
+                              Edit
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleRemove(
+                                  contact.id
+                                )
+                              }
+                              style={{
+                                padding:
+                                  "9px 16px",
+                                borderRadius:
+                                  "8px",
+                                border:
+                                  "none",
+                                cursor:
+                                  "pointer",
+                                fontWeight:
+                                  "bold",
+                              }}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )
+                )}
+              </div>
+            </>
           )}
-
         </section>
-
       </main>
-
     </div>
   );
 };
