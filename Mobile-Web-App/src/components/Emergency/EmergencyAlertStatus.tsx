@@ -24,6 +24,19 @@ const EmergencyAlertStatus = ({
     return success ? "✓" : "✗";
   };
 
+  const hasContactResults =
+    debug.contactResults.length > 0;
+
+  const failedContacts =
+    debug.contactResults.filter(
+      (result) =>
+        !result.success
+    );
+
+  const allContactsSuccessful =
+    hasContactResults &&
+    failedContacts.length === 0;
+
   return (
     <section
       className="diagnostics-card"
@@ -67,7 +80,73 @@ const EmergencyAlertStatus = ({
         </div>
       </div>
 
-      {/* Backend overall status */}
+      {/* GPS warning */}
+      {!locationAvailable && (
+        <div
+          style={{
+            marginTop: "15px",
+            padding: "12px",
+            borderRadius: "8px",
+            background: "#451a03",
+            border:
+              "1px solid #f59e0b",
+            color: "#fcd34d",
+          }}
+        >
+          <strong>
+            ⚠ GPS Location Unavailable
+          </strong>
+
+          <p
+            style={{
+              margin:
+                "6px 0 0",
+              fontSize: "14px",
+            }}
+          >
+            The emergency incident
+            was saved locally, but
+            the alert could not
+            include a GPS location.
+          </p>
+        </div>
+      )}
+
+      {/* Browser notification warning */}
+      {!notificationSent && (
+        <div
+          style={{
+            marginTop: "15px",
+            padding: "12px",
+            borderRadius: "8px",
+            background: "#451a03",
+            border:
+              "1px solid #f59e0b",
+            color: "#fcd34d",
+          }}
+        >
+          <strong>
+            ⚠ Browser Notification
+            Not Triggered
+          </strong>
+
+          <p
+            style={{
+              margin:
+                "6px 0 0",
+              fontSize: "14px",
+            }}
+          >
+            The emergency backend
+            processing can still
+            succeed even if browser
+            notifications are
+            unavailable.
+          </p>
+        </div>
+      )}
+
+      {/* Backend status */}
       <div
         style={{
           marginTop: "20px",
@@ -110,9 +189,43 @@ const EmergencyAlertStatus = ({
         )}
       </div>
 
-      {/* Per-contact results */}
-      {debug.contactResults.length >
-        0 && (
+      {/* Backend failure */}
+      {debug.requestStarted &&
+        !debug.backendSuccess &&
+        failedContacts.length ===
+          0 && (
+          <div
+            style={{
+              marginTop: "15px",
+              padding: "12px",
+              borderRadius: "8px",
+              background: "#450a0a",
+              border:
+                "1px solid #dc2626",
+              color: "#fca5a5",
+            }}
+          >
+            <strong>
+              ✗ Backend Alert Failed
+            </strong>
+
+            <p
+              style={{
+                margin:
+                  "6px 0 0",
+                fontSize: "14px",
+              }}
+            >
+              The emergency incident
+              was saved locally, but
+              the backend could not
+              process the alert.
+            </p>
+          </div>
+        )}
+
+      {/* Contact results */}
+      {hasContactResults && (
         <div
           style={{
             marginTop: "20px",
@@ -141,8 +254,7 @@ const EmergencyAlertStatus = ({
                   }
                   style={{
                     padding: "12px",
-                    borderRadius:
-                      "8px",
+                    borderRadius: "8px",
                     background:
                       result.success
                         ? "#14532d"
@@ -162,7 +274,9 @@ const EmergencyAlertStatus = ({
                     {getStatusIcon(
                       result.success
                     )}{" "}
-                    {result.contactName}
+                    {
+                      result.contactName
+                    }
                   </div>
 
                   <div
@@ -243,6 +357,60 @@ const EmergencyAlertStatus = ({
               )
             )}
           </div>
+        </div>
+      )}
+
+      {/* Partial failure summary */}
+      {failedContacts.length >
+        0 &&
+        debug.contactResults.length >
+          failedContacts.length && (
+          <div
+            style={{
+              marginTop: "15px",
+              padding: "12px",
+              borderRadius: "8px",
+              background: "#451a03",
+              border:
+                "1px solid #f59e0b",
+              color: "#fcd34d",
+            }}
+          >
+            <strong>
+              ⚠ Partial Alert Delivery
+            </strong>
+
+            <p
+              style={{
+                margin:
+                  "6px 0 0",
+                fontSize: "14px",
+              }}
+            >
+              Some emergency contacts
+              were successfully notified,
+              while one or more alerts
+              failed.
+            </p>
+          </div>
+        )}
+
+      {/* Overall success */}
+      {allContactsSuccessful && (
+        <div
+          style={{
+            marginTop: "15px",
+            padding: "12px",
+            borderRadius: "8px",
+            background: "#14532d",
+            border:
+              "1px solid #22c55e",
+          }}
+        >
+          <strong>
+            ✓ All Emergency Contacts
+            Processed Successfully
+          </strong>
         </div>
       )}
 

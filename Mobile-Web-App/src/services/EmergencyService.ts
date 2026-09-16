@@ -123,6 +123,12 @@ class EmergencyService {
       "🚨 EMERGENCY TRIGGERED"
     );
 
+    /*
+     * Clear the previous emergency's
+     * backend/contact status.
+     */
+    EmergencyAlertService.resetDebug();
+
     this.emergencyActive = true;
 
     let gps =
@@ -138,6 +144,10 @@ class EmergencyService {
       gps
     );
 
+    /*
+     * Always save the emergency incident,
+     * even if GPS is unavailable.
+     */
     HistoryService.addIncident({
       id: crypto.randomUUID(),
       timestamp: Date.now(),
@@ -178,7 +188,15 @@ class EmergencyService {
       }
     } else {
       console.warn(
-        "⚠️ No GPS location available. Backend alert not sent."
+        "⚠️ No GPS location available."
+      );
+
+      console.warn(
+        "⚠️ Emergency incident was saved locally."
+      );
+
+      console.warn(
+        "⚠️ Backend alert was not sent because location was unavailable."
       );
     }
 
@@ -255,6 +273,8 @@ class EmergencyService {
 
     this.secondsRemaining =
       this.duration;
+
+    EmergencyAlertService.resetDebug();
   }
 
   setTriggerCallback(
