@@ -36,6 +36,7 @@ const EmergencyAlertStatus = ({
         Emergency Alert Status
       </h2>
 
+      {/* Overall emergency status */}
       <div
         style={{
           display: "flex",
@@ -64,22 +65,9 @@ const EmergencyAlertStatus = ({
           )}{" "}
           Browser Notification Triggered
         </div>
-
-        <div>
-          {getStatusIcon(
-            debug.backendSuccess
-          )}{" "}
-          Backend Alerts Received
-        </div>
-
-        <div>
-          {getStatusIcon(
-            debug.smsSent
-          )}{" "}
-          SMS Alerts Simulated
-        </div>
       </div>
 
+      {/* Backend overall status */}
       <div
         style={{
           marginTop: "20px",
@@ -88,33 +76,192 @@ const EmergencyAlertStatus = ({
           background: "#1f2937",
         }}
       >
-        <p
+        <div>
+          {getStatusIcon(
+            debug.backendSuccess
+          )}{" "}
+          Backend Alerts Processed
+        </div>
+
+        <div
           style={{
-            margin: 0,
+            marginTop: "8px",
           }}
         >
-          <strong>
-            Alert Type:
-          </strong>{" "}
-          Fall Detected
-        </p>
+          {getStatusIcon(
+            debug.smsSent
+          )}{" "}
+          SMS Alerts Simulated
+        </div>
 
         {debug.httpStatus !== null && (
           <p
             style={{
               margin:
-                "8px 0 0",
+                "10px 0 0",
               fontSize: "14px",
             }}
           >
             <strong>
-              Backend HTTP Status:
+              Last Backend HTTP Status:
             </strong>{" "}
             {debug.httpStatus}
           </p>
         )}
       </div>
 
+      {/* Per-contact results */}
+      {debug.contactResults.length >
+        0 && (
+        <div
+          style={{
+            marginTop: "20px",
+          }}
+        >
+          <h3
+            style={{
+              marginBottom: "12px",
+            }}
+          >
+            Emergency Contacts
+          </h3>
+
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "10px",
+            }}
+          >
+            {debug.contactResults.map(
+              (result) => (
+                <div
+                  key={
+                    result.contactId
+                  }
+                  style={{
+                    padding: "12px",
+                    borderRadius:
+                      "8px",
+                    background:
+                      result.success
+                        ? "#14532d"
+                        : "#450a0a",
+                    border:
+                      result.success
+                        ? "1px solid #22c55e"
+                        : "1px solid #dc2626",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontWeight:
+                        "bold",
+                    }}
+                  >
+                    {getStatusIcon(
+                      result.success
+                    )}{" "}
+                    {result.contactName}
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop:
+                        "5px",
+                      fontSize:
+                        "14px",
+                      opacity: 0.9,
+                    }}
+                  >
+                    {result.phone}
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop:
+                        "5px",
+                      fontSize:
+                        "14px",
+                    }}
+                  >
+                    {result.success
+                      ? "Emergency alert processed"
+                      : "Emergency alert failed"}
+                  </div>
+
+                  {result.httpStatus !==
+                    null && (
+                    <div
+                      style={{
+                        marginTop:
+                          "4px",
+                        fontSize:
+                          "13px",
+                        opacity: 0.8,
+                      }}
+                    >
+                      HTTP Status:{" "}
+                      {
+                        result.httpStatus
+                      }
+                    </div>
+                  )}
+
+                  {result.smsSent && (
+                    <div
+                      style={{
+                        marginTop:
+                          "4px",
+                        fontSize:
+                          "13px",
+                      }}
+                    >
+                      ✓ Mock SMS
+                      processed
+                    </div>
+                  )}
+
+                  {result.error && (
+                    <div
+                      style={{
+                        marginTop:
+                          "6px",
+                        fontSize:
+                          "13px",
+                        color:
+                          "#fca5a5",
+                        wordBreak:
+                          "break-word",
+                      }}
+                    >
+                      Error:{" "}
+                      {result.error}
+                    </div>
+                  )}
+                </div>
+              )
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Alert type */}
+      <div
+        style={{
+          marginTop: "20px",
+          padding: "12px",
+          borderRadius: "8px",
+          background: "#1f2937",
+        }}
+      >
+        <strong>
+          Alert Type:
+        </strong>{" "}
+        Fall Detected
+      </div>
+
+      {/* General error */}
       {debug.error && (
         <div
           style={{
