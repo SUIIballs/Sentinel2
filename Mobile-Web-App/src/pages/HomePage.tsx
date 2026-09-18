@@ -10,7 +10,6 @@ import StatusCard from "../components/Status/StatusCard";
 import EmergencyCard from "../components/Emergency/EmergencyCard";
 import EmergencyAlert from "../components/Emergency/EmergencyAlert";
 import EmergencyCountdown from "../components/Emergency/EmergencyCountdown";
-import EmergencyAlertStatus from "../components/Emergency/EmergencyAlertStatus";
 
 import useMonitoring from "../hooks/useMonitoring";
 import EmergencyService from "../services/EmergencyService";
@@ -51,15 +50,6 @@ function HomePage({
     countdownSeconds,
     setCountdownSeconds,
   ] = useState(10);
-
-  // ==========================================
-  // NOTIFICATION STATE
-  // ==========================================
-
-  const [
-    notificationSent,
-    setNotificationSent,
-  ] = useState(false);
 
   // ==========================================
   // REAL FALL DETECTION
@@ -117,12 +107,8 @@ function HomePage({
         );
 
         /*
-         * EmergencyService has already:
-         *
-         * 1. Retrieved GPS
-         * 2. Saved history
-         * 3. Called EmergencyAlertService
-         * 4. Waited for backend response
+         * EmergencyService activates
+         * the emergency UI immediately.
          */
         confirmEmergency();
       },
@@ -155,10 +141,6 @@ function HomePage({
           await NotificationService.sendEmergencyNotification(
             location
           );
-
-        setNotificationSent(
-          sent
-        );
 
         console.log(
           "Browser notification result:",
@@ -195,10 +177,6 @@ function HomePage({
       setCountdownSeconds(
         10
       );
-
-      setNotificationSent(
-        false
-      );
     }, [
       cancelFallAlert,
     ]);
@@ -230,10 +208,6 @@ function HomePage({
       );
 
       EmergencyAlertService.resetDebug();
-
-      setNotificationSent(
-        false
-      );
 
       /*
        * Request notification permission.
@@ -310,10 +284,6 @@ function HomePage({
         10
       );
 
-      setNotificationSent(
-        false
-      );
-
       /*
        * Request browser notification
        * permission.
@@ -348,10 +318,6 @@ function HomePage({
 
       setCountdownSeconds(
         10
-      );
-
-      setNotificationSent(
-        false
       );
 
       stopMonitoring();
@@ -519,23 +485,7 @@ function HomePage({
         />
 
         {/* =================================== */}
-        {/* EMERGENCY ALERT STATUS              */}
-        {/* =================================== */}
-
-        <EmergencyAlertStatus
-          emergency={
-            emergency
-          }
-          locationAvailable={
-            location !== null
-          }
-          notificationSent={
-            notificationSent
-          }
-        />
-
-        {/* =================================== */}
-        {/* EMERGENCY COUNTDOWN                  */}
+        {/* EMERGENCY COUNTDOWN                 */}
         {/* =================================== */}
 
         <EmergencyCountdown
@@ -551,7 +501,7 @@ function HomePage({
         />
 
         {/* =================================== */}
-        {/* SIMULATE FALL                        */}
+        {/* SIMULATE FALL                       */}
         {/* =================================== */}
 
         <button

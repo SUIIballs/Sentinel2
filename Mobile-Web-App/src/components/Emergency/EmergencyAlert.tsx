@@ -1,3 +1,10 @@
+import {
+  useEffect,
+  useState,
+} from "react";
+
+import EmergencyAlertService from "../../services/EmergencyAlertService";
+
 interface EmergencyAlertProps {
   emergency: boolean;
   latitude: number | null;
@@ -11,8 +18,116 @@ const EmergencyAlert = ({
   longitude,
   onCancel,
 }: EmergencyAlertProps) => {
+  const [, setRefresh] =
+    useState(0);
+
+  /*
+   * EmergencyAlertService processes
+   * the backend request asynchronously.
+   *
+   * Refresh this component periodically
+   * so the message changes when the
+   * backend/contact processing finishes.
+   */
+  useEffect(() => {
+    if (!emergency) {
+      return;
+    }
+
+    const interval =
+      window.setInterval(() => {
+        setRefresh(
+          (value) => value + 1
+        );
+      }, 250);
+
+    return () => {
+      window.clearInterval(
+        interval
+      );
+    };
+  }, [emergency]);
+
   if (!emergency) {
     return null;
+  }
+
+  const debug =
+    EmergencyAlertService.getDebugState();
+
+  const hasContactResults =
+    debug.contactResults.length > 0;
+
+  const failedContacts =
+    debug.contactResults.filter(
+      (result) =>
+        !result.success
+    );
+
+  const processingComplete =
+    hasContactResults &&
+    debug.contactResults.length > 0 &&
+    debug.contactResults.every(
+      (result) =>
+        result.success
+    );
+
+  const processingFailed =
+    hasContactResults &&
+    failedContacts.length > 0;
+
+  let alertTitle =
+    "Emergency alert processing...";
+
+  let alertMessage =
+    "Sentinel is processing the emergency alert.";
+
+  let alertBackground =
+    "#172554";
+
+  if (processingComplete) {
+    alertTitle =
+      "Emergency alert processing completed.";
+
+    alertMessage =
+      "Backend alert and simulated SMS have been processed.";
+
+    alertBackground =
+      "#14532d";
+  }
+
+  if (processingFailed) {
+    alertTitle =
+      "Emergency alert processing failed.";
+
+    alertMessage =
+      "The emergency was detected and saved, but one or more backend alerts could not be processed.";
+
+    alertBackground =
+      "#450a0a";
+  }
+
+  /*
+   * If GPS is unavailable, the backend
+   * alert will not be attempted.
+   */
+  if (
+    !latitude ||
+    !longitude
+  ) {
+    if (
+      debug.serviceCalled &&
+      !debug.requestStarted
+    ) {
+      alertTitle =
+        "Emergency detected.";
+
+      alertMessage =
+        "The emergency was detected and saved locally, but GPS location was unavailable.";
+
+      alertBackground =
+        "#451a03";
+    }
   }
 
   return (
@@ -21,12 +136,14 @@ const EmergencyAlert = ({
         position: "fixed",
         top: "20px",
         left: "50%",
-        transform: "translateX(-50%)",
+        transform:
+          "translateX(-50%)",
         width: "min(90%, 520px)",
         zIndex: 9999,
         background: "#1f2937",
         color: "white",
-        border: "3px solid #dc2626",
+        border:
+          "3px solid #dc2626",
         borderRadius: "14px",
         padding: "24px",
         boxSizing: "border-box",
@@ -65,7 +182,8 @@ const EmergencyAlert = ({
             marginBottom: 0,
           }}
         >
-          A fall has been detected by Sentinel.
+          A fall has been detected by
+          Sentinel.
         </p>
       </div>
 
@@ -86,17 +204,29 @@ const EmergencyAlert = ({
           Emergency Information
         </h3>
 
-        <p style={{ margin: "6px 0" }}>
+        <p
+          style={{
+            margin: "6px 0",
+          }}
+        >
           <strong>Status:</strong>{" "}
           Emergency Confirmed
         </p>
 
-        <p style={{ margin: "6px 0" }}>
+        <p
+          style={{
+            margin: "6px 0",
+          }}
+        >
           <strong>Reason:</strong>{" "}
           Fall Detected
         </p>
 
-        <p style={{ margin: "6px 0" }}>
+        <p
+          style={{
+            margin: "6px 0",
+          }}
+        >
           <strong>GPS:</strong>{" "}
           {latitude !== null &&
           longitude !== null
@@ -130,9 +260,11 @@ const EmergencyAlert = ({
           )}
       </div>
 
+      {/* Dynamic alert processing status */}
       <div
         style={{
-          background: "#172554",
+          background:
+            alertBackground,
           borderRadius: "10px",
           padding: "12px",
           marginBottom: "18px",
@@ -140,18 +272,17 @@ const EmergencyAlert = ({
         }}
       >
         <strong>
-          Emergency alert processing completed.
+          {alertTitle}
         </strong>
 
         <p
           style={{
             margin: "6px 0 0",
             fontSize: "13px",
-            opacity: 0.85,
+            opacity: 0.9,
           }}
         >
-          Backend alert and simulated SMS have been
-          processed.
+          {alertMessage}
         </p>
       </div>
 

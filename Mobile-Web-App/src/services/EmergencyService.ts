@@ -166,26 +166,47 @@ class EmergencyService {
       "📋 Emergency incident saved."
     );
 
+    /*
+     * IMPORTANT:
+     *
+     * Show the emergency UI immediately.
+     * Do NOT wait for the backend or
+     * simulated SMS processing.
+     */
+    this.triggerCallback?.();
+
+    /*
+     * Finish the countdown immediately
+     * so the UI does not wait for the
+     * network request.
+     */
     if (gps) {
       console.log(
-        "📤 Sending emergency alert..."
+        "📤 Starting emergency alert processing in background..."
       );
 
-      const alertSent =
-        await EmergencyAlertService.sendEmergencyAlert(
+      void EmergencyAlertService
+        .sendEmergencyAlert(
           gps,
           "Fall Detected"
-        );
-
-      if (alertSent) {
-        console.log(
-          "✅ Emergency alert sent to all configured contacts."
-        );
-      } else {
-        console.warn(
-          "⚠️ One or more emergency alerts could not be sent."
-        );
-      }
+        )
+        .then((alertSent) => {
+          if (alertSent) {
+            console.log(
+              "✅ Emergency alert sent to all configured contacts."
+            );
+          } else {
+            console.warn(
+              "⚠️ One or more emergency alerts could not be sent."
+            );
+          }
+        })
+        .catch((error) => {
+          console.error(
+            "❌ Emergency alert processing failed:",
+            error
+          );
+        });
     } else {
       console.warn(
         "⚠️ No GPS location available."
@@ -204,8 +225,6 @@ class EmergencyService {
       "History:",
       HistoryService.getIncidents()
     );
-
-    this.triggerCallback?.();
   }
 
   cancel(): void {
